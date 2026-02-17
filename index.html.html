@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PRIMORDIAL COMMAND CENTER v2.0 — ENHANCED</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600&display=swap');
+
+  :root {
+    --void: #00000a;
+    --deep: #000820;
+    --panel: rgba(0,20,60,0.85);
+    --panel-ocean: rgba(0,40,30,0.85);
+    --neon-cyan: #00f5ff;
+    --neon-blue: #0088ff;
+    --neon-green: #00ff88;
+    --neon-amber: #ffaa00;
+    --neon-red: #ff3355;
+    --neon-purple: #cc44ff;
+    --neon-ocean: #00ffcc;
+    --text-dim: rgba(0,245,255,0.4);
+    --text-mid: rgba(0,245,255,0.7);
+    --glow-cyan: 0 0 10px #00f5ff, 0 0 30px rgba(0,245,255,0.3);
+    --glow-green: 0 0 10px #00ff88, 0 0 30px rgba(0,255,136,0.3);
+    --glow-amber: 0 0 10px #ffaa00, 0 0 30px rgba(255,170,0,0.3);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--void);
+    color: var(--neon-cyan);
+    font-family: 'Share Tech Mono', monospace;
+    overflow: hidden;
+    width: 100vw; height: 100vh;
+    user-select: none;
+  }
+
+  #starfield {
+    position: fixed; inset: 0; z-index: 0;
+  }
+
+  #app {
+    position: relative; z-index: 1;
+    display: grid;
+    grid-template-rows: 48px 1fr 180px;
+    grid-template-columns: 260px 1fr 260px;
+    width: 100vw; height: 100vh;
+    gap: 2px;
+    background: rgba(0,8,32,0.6);
+  }
+
+  #header {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px;
+    background: rgba(0,10,40,0.95);
+    border-bottom: 1px solid rgba(0,245,255,0.3);
+    box-shadow: 0 2px 20px rgba(0,245,255,0.1);
+  }
+
+  #header h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: 14px; font-weight: 900;
+    letter-spacing: 4px;
+    color: var(--neon-cyan);
+    text-shadow: var(--glow-cyan);
+  }
+
+  .header-status {
+    display: flex; gap: 20px; align-items: center;
+    font-size: 10px; color: var(--text-mid);
+  }
+
+  .status-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    display: inline-block; margin-right: 5px;
+    animation: pulse 2s infinite;
+  }
+  .dot-live { background: var(--neon-green); box-shadow: var(--glow-green); }
+  .dot-warn { background: var(--neon-amber); box-shadow: var(--glow-amber); animation-delay: 0.5s; }
+  .dot-nasa { background: var(--neon-blue); box-shadow: 0 0 10px #0088ff; animation-delay: 1s; }
+
+  @keyframes pulse {
+    0%,100% { opacity: 1; } 50% { opacity: 0.3; }
+  }
+
+  .mode-toggle {
+    display: flex; gap: 2px;
+  }
+  .mode-btn {
+    padding: 4px 12px; font-family: 'Orbitron', monospace;
+    font-size: 9px; font-weight: 700; letter-spacing: 2px;
+    border: 1px solid currentColor; background: transparent;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .mode-btn.space { color: var(--neon-blue); }
+  .mode-btn.ocean { color: var(--neon-ocean); }
+  .mode-btn.active-space { background: rgba(0,136,255,0.2); color: var(--neon-cyan); box-shadow: var(--glow-cyan); }
+  .mode-btn.active-ocean { background: rgba(0,255,204,0.15); color: var(--neon-ocean); box-shadow: 0 0 10px #00ffcc; }
+
+  #panel-left, #panel-right {
+    background: var(--panel);
+    overflow-y: auto; overflow-x: hidden;
+    padding: 10px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  #panel-left { border-right: 1px solid rgba(0,245,255,0.15); }
+  #panel-right { border-left: 1px solid rgba(0,245,255,0.15); }
+  #panel-left.ocean-mode { background: var(--panel-ocean); border-right-color: rgba(0,255,204,0.15); }
+
+  #viewport {
+    position: relative;
+    background: var(--void);
+    overflow: hidden;
+  }
+
+  #main-canvas {
+    width: 100%; height: 100%;
+    display: block;
+  }
+
+  .hud-overlay {
+    position: absolute; pointer-events: none;
+  }
+
+  #crosshair {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px; height: 40px;
+  }
+  #crosshair::before, #crosshair::after {
+    content: '';position:absolute;background:rgba(0,245,255,0.6);
+  }
+  #crosshair::before { width:1px;height:100%;left:50%;top:0; }
+  #crosshair::after { width:100%;height:1px;top:50%;left:0; }
+
+  .crosshair-ring {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    border-radius: 50%; border: 1px solid rgba(0,245,255,0.4);
+    animation: ringpulse 3s infinite;
+  }
+  @keyframes ringpulse {
+    0%,100%{transform:translate(-50%,-50%) scale(1);opacity:0.4}
+    50%{transform:translate(-50%,-50%) scale(1.2);opacity:0.1}
+  }
+
+  #coords-hud {
+    position: absolute; bottom: 10px; left: 10px;
+    font-size: 9px; color: var(--text-mid); line-height: 1.8;
+  }
+
+  #velocity-hud {
+    position: absolute; top: 10px; right: 10px;
+    text-align: right; font-size: 9px; color: var(--text-mid); line-height: 1.8;
+  }
+
+  #target-hud {
+    position: absolute; top: 10px; left: 10px;
+    font-size: 9px; color: var(--neon-amber); line-height: 1.8;
+  }
+
+  #bottom-controls {
+    grid-column: 1 / -1;
+    background: rgba(0,8,28,0.95);
+    border-top: 1px solid rgba(0,245,255,0.2);
+    display: grid;
+    grid-template-columns: 1fr 300px 1fr;
+    padding: 8px 12px;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .panel-section {
+    border: 1px solid rgba(0,245,255,0.12);
+    padding: 8px;
+    position: relative;
+  }
+  .ocean-mode .panel-section { border-color: rgba(0,255,204,0.12); }
+
+  .section-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 8px; font-weight: 700; letter-spacing: 3px;
+    color: var(--text-dim); margin-bottom: 8px;
+    border-bottom: 1px solid rgba(0,245,255,0.1);
+    padding-bottom: 4px;
+  }
+
+  .data-row {
+    display: flex; justify-content: space-between;
+    font-size: 9px; margin-bottom: 3px; color: var(--text-mid);
+  }
+  .data-val { color: var(--neon-cyan); font-weight: bold; }
+  .data-val.green { color: var(--neon-green); }
+  .data-val.amber { color: var(--neon-amber); }
+  .data-val.red { color: var(--neon-red); }
+  .data-val.purple { color: var(--neon-purple); }
+  .data-val.ocean { color: var(--neon-ocean); }
+  .data-val.nasa { color: var(--neon-blue); }
+
+  .meter-bar {
+    height: 4px; background: rgba(255,255,255,0.05);
+    margin-top: 2px; margin-bottom: 6px; position: relative;
+  }
+  .meter-fill {
+    height: 100%; transition: width 0.5s ease;
+  }
+  .meter-cyan .meter-fill { background: var(--neon-cyan); box-shadow: var(--glow-cyan); }
+  .meter-green .meter-fill { background: var(--neon-green); box-shadow: var(--glow-green); }
+  .meter-amber .meter-fill { background: var(--neon-amber); box-shadow: var(--glow-amber); }
+  .meter-nasa .meter-fill { background: var(--neon-blue); }
+
+  .ctrl-label {
+    font-size: 9px; color: var(--text-dim); margin-bottom: 3px; display: block;
+  }
+
+  input[type=range] {
+    width: 100%; height: 4px; margin: 4px 0 8px;
+    -webkit-appearance: none; background: rgba(0,245,255,0.1);
+    border-radius: 2px; outline: none; cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 12px; height: 12px;
+    border-radius: 50%; background: var(--neon-cyan);
+    box-shadow: var(--glow-cyan);
+  }
+
+  #propulsion-grid {
+    display: grid; grid-template-columns: repeat(3,36px);
+    grid-template-rows: repeat(3,36px); gap: 3px;
+    justify-content: center;
+  }
+  .thrust-btn {
+    border: 1px solid rgba(0,245,255,0.3);
+    background: rgba(0,20,60,0.8);
+    color: var(--neon-cyan); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; transition: all 0.1s;
+    border-radius: 2px;
+  }
+  .thrust-btn:hover { background: rgba(0,136,255,0.3); box-shadow: var(--glow-cyan); }
+  .thrust-btn:active { background: rgba(0,245,255,0.2); transform: scale(0.95); }
+  .thrust-btn.center { font-size: 9px; font-family: 'Orbitron', monospace; letter-spacing: 1px; }
+
+  #log-console {
+    font-size: 8px; line-height: 1.7; max-height: 100px;
+    overflow-y: auto; color: var(--text-mid);
+  }
+  .log-line { border-bottom: 1px solid rgba(0,245,255,0.03); padding: 1px 0; }
+  .log-time { color: var(--text-dim); margin-right: 6px; }
+  .log-info { color: var(--neon-cyan); }
+  .log-warn { color: var(--neon-amber); }
+  .log-data { color: var(--neon-green); }
+  .log-ocean { color: var(--neon-ocean); }
+  .log-nasa { color: var(--neon-blue); }
+
+  #waveform-canvas, #spectrum-canvas { width: 100%; display: block; }
+  #waveform-canvas { height: 40px; }
+  #spectrum-canvas { height: 30px; }
+
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(0,245,255,0.2); border-radius: 2px; }
+
+  #scanlines {
+    position: fixed; inset: 0; z-index: 100; pointer-events: none;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 4px);
+    animation: scan 8s linear infinite;
+  }
+  @keyframes scan {
+    0%{background-position:0 0} 100%{background-position:0 100%}
+  }
+
+  .live-badge {
+    font-size: 8px; padding: 2px 6px;
+    border: 1px solid var(--neon-red);
+    color: var(--neon-red); animation: pulse 1s infinite;
+    font-family: 'Orbitron', monospace; letter-spacing: 2px;
+  }
+
+  .bottom-section { display: flex; flex-direction: column; gap: 6px; }
+  .bottom-label {
+    font-family: 'Orbitron', monospace; font-size: 8px;
+    letter-spacing: 2px; color: var(--text-dim);
+  }
+
+  select {
+    background: rgba(0,20,60,0.9); color: var(--neon-cyan);
+    border: 1px solid rgba(0,245,255,0.3); padding: 3px 6px;
+    font-family: 'Share Tech Mono', monospace; font-size: 9px;
+    width: 100%; margin-bottom: 6px; outline: none; cursor: pointer;
+  }
+
+  .btn-small {
+    padding: 4px 8px; font-family: 'Orbitron', monospace;
+    font-size: 8px; letter-spacing: 1px; font-weight: 700;
+    border: 1px solid currentColor; background: transparent;
+    cursor: pointer; transition: all 0.15s; width: 100%; margin-bottom: 3px;
+  }
+  .btn-cyan { color: var(--neon-cyan); }
+  .btn-cyan:hover { background: rgba(0,245,255,0.15); box-shadow: var(--glow-cyan); }
+  .btn-green { color: var(--neon-green); }
+  .btn-green:hover { background: rgba(0,255,136,0.1); box-shadow: var(--glow-green); }
+  .btn-amber { color: var(--neon-amber); }
+  .btn-amber:hover { background: rgba(255,170,0,0.1); box-shadow: var(--glow-amber); }
+  .btn-nasa { color: var(--neon-blue); }
+  .btn-nasa:hover { background: rgba(0,136,255,0.15); box-shadow: 0 0 10px #0088ff; }
+
+  .nasa-data-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 3px;
+    font-size: 8px;
+    max-height: 150px;
+    overflow-y: auto;
+  }
+  .nasa-collection-item {
+    padding: 4px 6px;
+    background: rgba(0,136,255,0.08);
+    border-left: 2px solid var(--neon-blue);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .nasa-collection-item:hover {
+    background: rgba(0,136,255,0.15);
+    border-left-color: var(--neon-cyan);
+  }
+  .collection-title {
+    color: var(--neon-blue);
+    font-weight: bold;
+    margin-bottom: 2px;
+  }
+  .collection-provider {
+    color: var(--text-dim);
+    font-size: 7px;
+  }
+
+  #obj-info {
+    position: absolute; right: 10px; bottom: 10px;
+    background: rgba(0,10,30,0.95);
+    border: 1px solid rgba(0,245,255,0.4);
+    padding: 8px 12px; font-size: 9px;
+    min-width: 180px; max-width: 220px;
+    display: none;
+    box-shadow: var(--glow-cyan);
+  }
+  #obj-info.visible { display: block; }
+  #obj-info h3 {
+    font-family: 'Orbitron', monospace; font-size: 10px;
+    color: var(--neon-cyan); margin-bottom: 6px;
+  }
+
+</style>
+</head>
+<body>
+
+<canvas id="starfield"></canvas>
+<div id="scanlines"></div>
+
+<div id="app">
+  <header id="header">
+    <h1>⬡ PRIMORDIAL COMMAND CENTER v2.0</h1>
+    <div class="header-status">
+      <span><span class="status-dot dot-live"></span>LIVE FEED</span>
+      <span id="live-time">00:00:00 UTC</span>
+      <span><span class="status-dot dot-nasa"></span>NASA CMR</span>
+      <span id="nasa-status">CONNECTED</span>
+      <span id="mode-label">MODE: DEEP SPACE</span>
+      <div class="live-badge">● REC</div>
+    </div>
+    <div class="mode-toggle">
+      <button class="mode-btn space active-space" onclick="setMode('space')">⚫ SPACE</button>
+      <button class="mode-btn ocean" onclick="setMode('ocean')">🌊 OCEAN</button>
+    </div>
+  </header>
+
+  <div id="panel-left">
+
+    <div class="panel-section" id="nav-section">
+      <div class="section-title">◈ NAVIGATION & POSITION</div>
+      <div class="data-row"><span>X COORD</span><span class="data-val" id="pos-x">+0.000 AU</span></div>
+      <div class="data-row"><span>Y COORD</span><span class="data-val" id="pos-y">+0.000 AU</span></div>
+      <div class="data-row"><span>Z COORD</span><span class="data-val" id="pos-z">+0.000 AU</span></div>
+      <div class="data-row"><span>DIST SOL</span><span class="data-val green" id="dist-sol">0.00 LY</span></div>
+      <div class="data-row"><span>GALACTIC L</span><span class="data-val amber" id="gal-l">0.00°</span></div>
+      <div class="data-row"><span>GALACTIC B</span><span class="data-val amber" id="gal-b">0.00°</span></div>
+      <div class="data-row"><span>SECTOR</span><span class="data-val purple" id="sector">SOL SYSTEM</span></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">◈ VELOCITY & PROPULSION</div>
+      <div class="data-row"><span>VX</span><span class="data-val" id="vel-x">0.000 km/s</span></div>
+      <div class="data-row"><span>VY</span><span class="data-val" id="vel-y">0.000 km/s</span></div>
+      <div class="data-row"><span>VZ</span><span class="data-val" id="vel-z">0.000 km/s</span></div>
+      <div class="data-row"><span>TOTAL V</span><span class="data-val green" id="vel-total">0.000 km/s</span></div>
+      <div class="data-row"><span>% OF C</span><span class="data-val purple" id="pct-c">0.000%</span></div>
+      <br>
+      <label class="ctrl-label">THRUST POWER</label>
+      <input type="range" id="thrust-power" min="0.1" max="100" value="1" step="0.1">
+      <label class="ctrl-label">WARP FACTOR</label>
+      <input type="range" id="warp-factor" min="1" max="10" value="1" step="0.1">
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">◈ ENVIRONMENT SCAN</div>
+      <div class="data-row"><span>TEMP</span><span class="data-val" id="env-temp">2.725 K</span></div>
+      <div class="data-row"><span>RADIATION</span><span class="data-val red" id="env-rad">0.12 Sv/hr</span></div>
+      <div class="data-row"><span>GRAVITY</span><span class="data-val green" id="env-grav">≈ 0 g</span></div>
+      <div class="meter-bar meter-cyan"><div class="meter-fill" id="rad-meter" style="width:12%"></div></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">◈ ACOUSTIC SPECTRUM</div>
+      <canvas id="spectrum-canvas"></canvas>
+      <div class="data-row" style="margin-top:4px"><span>SOFAR DEPTH</span><span class="data-val ocean" id="sofar-depth">1000 m</span></div>
+      <div class="data-row"><span>SOUND SPEED</span><span class="data-val ocean" id="sound-speed">1500 m/s</span></div>
+    </div>
+
+  </div>
+
+  <div id="viewport">
+    <canvas id="main-canvas"></canvas>
+    <div id="crosshair">
+      <div class="crosshair-ring" style="width:20px;height:20px"></div>
+      <div class="crosshair-ring" style="width:60px;height:60px;animation-delay:1s"></div>
+      <div class="crosshair-ring" style="width:100px;height:100px;animation-delay:2s"></div>
+    </div>
+    <div id="coords-hud">
+      <div>RA: <span id="hud-ra">00h 00m 00s</span></div>
+      <div>DEC: <span id="hud-dec">+00° 00' 00"</span></div>
+      <div>FOV: <span id="hud-fov">1.00°</span></div>
+    </div>
+    <div id="velocity-hud">
+      <div>V_TOT: <span id="hud-vel">0.000</span> km/s</div>
+      <div>BEARING: <span id="hud-bear">000.0°</span></div>
+      <div>THROTTLE: <span id="hud-throttle">0%</span></div>
+    </div>
+    <div id="target-hud">
+      <div>TARGET: <span id="target-name">NONE</span></div>
+      <div>DIST: <span id="target-dist">—</span></div>
+    </div>
+    <div id="obj-info">
+      <h3 id="info-name">—</h3>
+      <div class="data-row"><span>TYPE</span><span class="data-val" id="info-type">—</span></div>
+      <div class="data-row"><span>DISTANCE</span><span class="data-val" id="info-dist">—</span></div>
+    </div>
+  </div>
+
+  <div id="panel-right">
+
+    <div class="panel-section">
+      <div class="section-title">◈ NASA EARTHDATA — LIVE</div>
+      <div class="data-row">
+        <span>TOKEN STATUS</span>
+        <span class="data-val nasa" id="token-status">AUTHENTICATED</span>
+      </div>
+      <div class="data-row">
+        <span>API ENDPOINT</span>
+        <span class="data-val" style="font-size:7px">CMR SEARCH</span>
+      </div>
+      <div class="data-row">
+        <span>COLLECTIONS</span>
+        <span class="data-val green" id="collection-count">—</span>
+      </div>
+      <div class="meter-bar meter-nasa">
+        <div class="meter-fill" id="nasa-meter" style="width:0%"></div>
+      </div>
+      <button class="btn-small btn-nasa" onclick="fetchNASACollections()">⟳ QUERY NASA CMR</button>
+      <button class="btn-small btn-cyan" onclick="fetchLiveEarthData()">⊕ REAL-TIME EARTH DATA</button>
+      <button class="btn-small btn-green" onclick="fetchOceanData()">🌊 OCEAN DATASETS</button>
+      <div id="nasa-collections" class="nasa-data-grid" style="margin-top:6px"></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">◈ PRIMORDIAL ACOUSTICS</div>
+      <canvas id="waveform-canvas"></canvas>
+      <div class="data-row" style="margin-top:4px"><span>CMB TEMP</span><span class="data-val">2.725 K</span></div>
+      <div class="data-row"><span>SOUND HORIZ</span><span class="data-val green" id="sound-horiz">147 Mpc</span></div>
+      <div class="data-row"><span>REDSHIFT</span><span class="data-val amber" id="redshift-val">z=1100</span></div>
+      <label class="ctrl-label" style="margin-top:4px">REDSHIFT PROBE</label>
+      <input type="range" id="redshift-range" min="0" max="1100" value="1100" step="10">
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">◈ CAVITATION DYNAMICS</div>
+      <div class="data-row"><span>BUBBLE R</span><span class="data-val" id="bubble-r">5.00 μm</span></div>
+      <div class="data-row"><span>COLLAPSE V</span><span class="data-val red" id="bubble-v">0.00 m/s</span></div>
+      <div class="data-row"><span>PRESSURE</span><span class="data-val amber" id="bubble-p">101.3 kPa</span></div>
+      <div class="meter-bar meter-amber">
+        <div class="meter-fill" id="bubble-meter" style="width:30%"></div>
+      </div>
+      <label class="ctrl-label">ACOUSTIC AMPLITUDE</label>
+      <input type="range" id="amplitude-range" min="0.1" max="3.0" value="1.5" step="0.1">
+      <label class="ctrl-label">DRIVE FREQ (kHz)</label>
+      <input type="range" id="freq-range" min="1" max="100" value="20" step="1">
+      <div class="data-row"><span>DRIVE FREQ</span><span class="data-val ocean" id="drive-freq">20 kHz</span></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">◈ NHI SIGNAL MONITOR</div>
+      <div class="data-row"><span>H-LINE</span><span class="data-val green">1420.41 MHz</span></div>
+      <div class="data-row"><span>WATER HOLE</span><span class="data-val ocean">1420–1727 MHz</span></div>
+      <div class="data-row"><span>SIGNAL SNR</span><span class="data-val" id="nhi-snr">—</span></div>
+      <button class="btn-small btn-green" onclick="scanNHI()" style="margin-top:4px">◉ SCAN NHI FREQ</button>
+    </div>
+
+  </div>
+
+  <div id="bottom-controls">
+
+    <div class="bottom-section">
+      <div class="bottom-label">MANUAL PROPULSION</div>
+      <div style="display:flex;gap:16px;align-items:center">
+        <div id="propulsion-grid">
+          <div></div>
+          <button class="thrust-btn" onclick="thrust(0,-1,0)">↑</button>
+          <div></div>
+          <button class="thrust-btn" onclick="thrust(-1,0,0)">←</button>
+          <button class="thrust-btn center" onclick="stopThrust()">STOP</button>
+          <button class="thrust-btn" onclick="thrust(1,0,0)">→</button>
+          <div></div>
+          <button class="thrust-btn" onclick="thrust(0,1,0)">↓</button>
+          <div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <button class="thrust-btn" style="width:80px;font-size:10px" onclick="thrust(0,0,-1)">▲ FWD</button>
+          <button class="thrust-btn" style="width:80px;font-size:10px" onclick="thrust(0,0,1)">▼ REV</button>
+          <button class="thrust-btn" style="width:80px;font-size:8px;color:var(--neon-amber)" onclick="fullStop()">⊗ FULL STOP</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-section" style="align-items:center">
+      <div class="bottom-label" style="text-align:center">SYSTEM STATUS</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;font-size:9px;margin-top:4px">
+        <div class="data-row"><span>SHIELDS</span><span class="data-val green">100%</span></div>
+        <div class="data-row"><span>POWER</span><span class="data-val green">98.7%</span></div>
+        <div class="data-row"><span>SENSORS</span><span class="data-val green">NOMINAL</span></div>
+        <div class="data-row"><span>NASA API</span><span class="data-val nasa" id="api-status">READY</span></div>
+      </div>
+    </div>
+
+    <div class="bottom-section">
+      <div class="bottom-label">MISSION LOG</div>
+      <div id="log-console"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// NASA EARTHDATA TOKEN
+const NASA_TOKEN = 'eyJ0eXAiOiJKV1QiLCJvcmlnaW4iOiJFYXJ0aGRhdGEgTG9naW4iLCJzaWciOiJlZGxqd3RwdWJrZXlfb3BzIiwiYWxnIjoiUlMyNTYifQ.eyJ0eXBlIjoiVXNlciIsInVpZCI6ImV2aWVrcmFuamFrIiwiZXhwIjoxNzc2NTQwMTg5LCJpYXQiOjE3NzEzNTYxODksImlzcyI6Imh0dHBzOi8vdXJzLmVhcnRoZGF0YS5uYXNhLmdvdiIsImlkZW50aXR5X3Byb3ZpZGVyIjoiZWRsX29wcyIsImFjciI6ImVkbCIsImFzc3VyYW5jZV9sZXZlbCI6M30.GLVRw2bmm5z5LW6sGtqLrXPmDHeCBzdVvsYnKRdHWq5ggM6llkpwkeS3rfu5Yn9TiY3A4CnYFcSRPXemlCwoykFsZppzTsa3efrSPHpLBfTuVisI06TbWS45tFrzGhfYAd9mznwM_FzHu9jpUBsqovmS3eUMsy1xe6-jo5bokwDak1fYFEXydeBNJA6HogFOObd9JDVoLtDk10543Ry_vV4QIby71yQg9ztF8DWhUrn1vsB3bgoQMJdwHfebjsnZgh36VYJHvkEHGVWCPLcWDw622_59xEbXePC6e6fF_1-xWGo1mU-9oD6QCpvDj2W4KAfWg6t1bz_ur1Iyu9H1pg';
+
+const STATE = {
+  mode: 'space',
+  pos: { x: 0, y: 0, z: 0 },
+  vel: { x: 0, y: 0, z: 0 },
+  warpFactor: 1,
+  thrustPower: 1,
+  redshift: 1100,
+  amplitude: 1.5,
+  driveFreq: 20000,
+  tick: 0,
+  fov: 1.0,
+  bearing: 0,
+  viewAngleX: 0,
+  viewAngleY: 0,
+  bubbleR: 5e-6,
+  bubbleV: 0,
+  oceanDepth: 0,
+  isDragging: false,
+  lastMouse: { x: 0, y: 0 },
+  nasaCollections: [],
+  nasaConnected: true
+};
+
+// CELESTIAL OBJECTS
+const OBJECTS = {
+  sun:        { name: 'SUN', type: 'G-TYPE STAR', x: 0, y: 0, z: 0, color: '#ffdd44', size: 18 },
+  earth:      { name: 'EARTH', type: 'HABITABLE PLANET', x: 1.0, y: 0, z: 0, color: '#4488ff', size: 8 },
+  mars:       { name: 'MARS', type: 'ROCKY PLANET', x: 1.52, y: -0.15, z: 0.03, color: '#ff6633', size: 5 },
+  jupiter:    { name: 'JUPITER', type: 'GAS GIANT', x: 5.2, y: 0.3, z: -0.1, color: '#ffaa66', size: 14 },
+  saturn:     { name: 'SATURN', type: 'RINGED GIANT', x: 9.5, y: -0.4, z: 0.15, color: '#ffddaa', size: 12 },
+  proxima:    { name: 'PROXIMA CENTAURI', type: 'M-DWARF STAR', x: 268000, y: 1200, z: -800, color: '#ff4422', size: 6 },
+  sagittarius:{ name: 'SGR A*', type: 'BLACK HOLE', x: 1.7e9, y: -1.2e7, z: 2.1e7, color: '#ffaa00', size: 12 },
+};
+
+// STARFIELD
+const sfCanvas = document.getElementById('starfield');
+const sfCtx = sfCanvas.getContext('2d');
+let stars = [];
+
+function initStars() {
+  sfCanvas.width = window.innerWidth;
+  sfCanvas.height = window.innerHeight;
+  stars = Array.from({length: 800}, () => ({
+    x: Math.random() * sfCanvas.width,
+    y: Math.random() * sfCanvas.height,
+    r: Math.random() * 1.5,
+    brightness: Math.random(),
+    twinkle: Math.random() * Math.PI * 2,
+    speed: Math.random() * 0.3 + 0.05
+  }));
+}
+
+function renderStarfield() {
+  sfCtx.clearRect(0, 0, sfCanvas.width, sfCanvas.height);
+  const t = Date.now() * 0.001;
+  stars.forEach(s => {
+    const tw = 0.7 + 0.3 * Math.sin(t * s.speed + s.twinkle);
+    sfCtx.beginPath();
+    sfCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    sfCtx.fillStyle = `rgba(200,220,255,${s.brightness * tw})`;
+    sfCtx.fill();
+  });
+}
+
+// MAIN VIEWPORT
+const mainCanvas = document.getElementById('main-canvas');
+const ctx = mainCanvas.getContext('2d');
+
+function resizeCanvases() {
+  const vp = document.getElementById('viewport');
+  mainCanvas.width = vp.clientWidth;
+  mainCanvas.height = vp.clientHeight;
+}
+
+function worldToScreen(wx, wy, wz) {
+  const cx = mainCanvas.width / 2;
+  const cy = mainCanvas.height / 2;
+  const scale = 50 / STATE.fov;
+  
+  const cosX = Math.cos(STATE.viewAngleX), sinX = Math.sin(STATE.viewAngleX);
+  const cosY = Math.cos(STATE.viewAngleY), sinY = Math.sin(STATE.viewAngleY);
+  
+  let rx = wx - STATE.pos.x;
+  let ry = wy - STATE.pos.y;
+  let rz = wz - STATE.pos.z;
+  
+  const ry2 = ry * cosX - rz * sinX;
+  const rz2 = ry * sinX + rz * cosX;
+  const rx3 = rx * cosY + rz2 * sinY;
+  const rz3 = -rx * sinY + rz2 * cosY;
+  
+  const depth = rz3 + 0.001;
+  const sx = cx + (rx3 / (depth * 0.001 + 1)) * scale;
+  const sy = cy + (ry2 / (depth * 0.001 + 1)) * scale;
+  return { sx, sy, depth: rz3 };
+}
+
+function renderSpace() {
+  const W = mainCanvas.width, H = mainCanvas.height;
+  ctx.clearRect(0, 0, W, H);
+  
+  const grad = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, W/1.5);
+  grad.addColorStop(0, 'rgba(0,10,30,0.8)');
+  grad.addColorStop(1, 'rgba(0,0,8,0.95)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+  
+  // Grid
+  ctx.strokeStyle = 'rgba(0,245,255,0.03)';
+  ctx.lineWidth = 0.5;
+  const gridStep = W / 8;
+  for (let x = 0; x <= W; x += gridStep) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let y = 0; y <= H; y += gridStep) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  
+  // Objects
+  Object.entries(OBJECTS).forEach(([key, obj]) => {
+    const { sx, sy } = worldToScreen(obj.x, obj.y, obj.z);
+    if (sx < -50 || sx > W+50 || sy < -50 || sy > H+50) return;
+    
+    const r = obj.size || 6;
+    
+    // Glow
+    const glowGrad = ctx.createRadialGradient(sx, sy, 0, sx, sy, r * 4);
+    glowGrad.addColorStop(0, obj.color + '66');
+    glowGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = glowGrad;
+    ctx.beginPath();
+    ctx.arc(sx, sy, r * 4, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Body
+    ctx.beginPath();
+    ctx.arc(sx, sy, r, 0, Math.PI * 2);
+    ctx.fillStyle = obj.color;
+    ctx.fill();
+    
+    // Label
+    ctx.fillStyle = `rgba(0,245,255,0.6)`;
+    ctx.font = '8px Share Tech Mono';
+    ctx.fillText(obj.name, sx + r + 4, sy + 3);
+    
+    // Saturn rings
+    if (key === 'saturn') {
+      ctx.strokeStyle = 'rgba(255,221,170,0.4)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, r * 2.5, r * 0.6, 0.3, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  });
+}
+
+function renderOcean() {
+  const W = mainCanvas.width, H = mainCanvas.height;
+  ctx.clearRect(0, 0, W, H);
+  const t = Date.now() * 0.001;
+  const depth = Math.abs(STATE.oceanDepth);
+  
+  // Deep water gradient
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  if (depth < 200) {
+    grad.addColorStop(0, '#001830'); grad.addColorStop(1, '#003050');
+  } else if (depth < 1000) {
+    grad.addColorStop(0, '#000d20'); grad.addColorStop(1, '#002040');
+  } else {
+    grad.addColorStop(0, '#000510'); grad.addColorStop(1, '#001020');
+  }
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+  
+  // Bioluminescence
+  for (let i = 0; i < 30; i++) {
+    const px = (Math.sin(t * 0.3 + i * 2.1) * 0.5 + 0.5) * W;
+    const py = (Math.sin(t * 0.2 + i * 3.3) * 0.5 + 0.5) * H;
+    const bright = Math.sin(t * 1.5 + i) * 0.5 + 0.5;
+    const r = 2 + bright * 3;
+    ctx.beginPath();
+    ctx.arc(px, py, r, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(0,255,200,${bright * 0.6})`;
+    ctx.fill();
+  }
+  
+  // SOFAR channel
+  if (depth > 600 && depth < 1200) {
+    const bandGrad = ctx.createLinearGradient(0, 0, 0, H);
+    bandGrad.addColorStop(0, 'transparent');
+    bandGrad.addColorStop(0.5, 'rgba(0,255,204,0.1)');
+    bandGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = bandGrad;
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(0,255,204,0.6)';
+    ctx.font = '10px Orbitron';
+    ctx.fillText('◈ SOFAR CHANNEL ACTIVE', 10, H/2);
+  }
+  
+  // Sound wave rings
+  for (let i = 0; i < 5; i++) {
+    const phase = ((t * 0.4 + i / 5) % 1);
+    const radius = phase * W * 0.8;
+    ctx.beginPath();
+    ctx.ellipse(W/2, H/2, radius, radius * 0.3, 0, 0, Math.PI*2);
+    ctx.strokeStyle = `rgba(0,255,204,${(1-phase) * 0.3})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+}
+
+// WAVEFORM
+const wfCanvas = document.getElementById('waveform-canvas');
+const wfCtx = wfCanvas.getContext('2d');
+
+function renderWaveform() {
+  const W = 230, H = 40;
+  wfCanvas.width = W; wfCanvas.height = H;
+  wfCtx.clearRect(0,0,W,H);
+  const t = Date.now() * 0.001;
+  const z = STATE.redshift / 1100;
+  
+  wfCtx.beginPath();
+  for (let x = 0; x < W; x++) {
+    const phase = (x / W) * Math.PI * 8 * z;
+    const y = H/2 + Math.sin(phase + t * 2) * (H/2 - 4) * 0.6
+                   + Math.sin(phase * 2.3 + t) * (H/2 - 4) * 0.25;
+    if (x === 0) wfCtx.moveTo(x, y); else wfCtx.lineTo(x, y);
+  }
+  wfCtx.strokeStyle = '#cc44ff';
+  wfCtx.lineWidth = 1.5;
+  wfCtx.shadowBlur = 8;
+  wfCtx.shadowColor = '#cc44ff';
+  wfCtx.stroke();
+  wfCtx.shadowBlur = 0;
+}
+
+// SPECTRUM
+const spCanvas = document.getElementById('spectrum-canvas');
+const spCtx = spCanvas.getContext('2d');
+
+function renderSpectrum() {
+  const W = 230, H = 30;
+  spCanvas.width = W; spCanvas.height = H;
+  spCtx.clearRect(0,0,W,H);
+  const t = Date.now() * 0.001;
+  const amp = STATE.amplitude;
+  const freq = STATE.driveFreq;
+  
+  const bands = 40;
+  for (let i = 0; i < bands; i++) {
+    const x = (i / bands) * W;
+    const bw = (W / bands) - 1;
+    const baseH = Math.sin(i * 0.8 + t * freq * 0.0001) * 0.5 + 0.5;
+    const h = baseH * H * amp / 3;
+    const r = i / bands;
+    const g = 1 - r * 0.5;
+    spCtx.fillStyle = `rgba(0,${Math.floor(255*g)},${Math.floor(255*(1-r))},0.8)`;
+    spCtx.fillRect(x, H - h, bw, h);
+  }
+  
+  // H-line marker
+  const hx = (1420 / 2000) * W;
+  spCtx.strokeStyle = '#00ff88';
+  spCtx.lineWidth = 1;
+  spCtx.beginPath(); spCtx.moveTo(hx,0); spCtx.lineTo(hx,H); spCtx.stroke();
+}
+
+// PHYSICS
+function updatePhysics() {
+  STATE.vel.x *= 0.98;
+  STATE.vel.y *= 0.98;
+  STATE.vel.z *= 0.98;
+  
+  STATE.pos.x += STATE.vel.x * 0.01;
+  STATE.pos.y += STATE.vel.y * 0.01;
+  STATE.pos.z += STATE.vel.z * 0.01;
+  
+  if (STATE.mode === 'ocean') {
+    STATE.oceanDepth = STATE.pos.y;
+  }
+  
+  const t = Date.now() * 0.001;
+  const pressure = STATE.amplitude * 101325 * Math.sin(2 * Math.PI * STATE.driveFreq * t * 0.0001);
+  STATE.bubbleR = Math.max(0.5e-6, 5e-6 + pressure * 1e-11);
+  STATE.bubbleV = pressure * 0.001;
+}
+
+// UI UPDATE
+function updateUI() {
+  const utc = new Date().toUTCString().slice(-12,-4);
+  document.getElementById('live-time').textContent = utc + ' UTC';
+  
+  const velMag = Math.sqrt(STATE.vel.x**2 + STATE.vel.y**2 + STATE.vel.z**2);
+  const distSol = Math.sqrt(STATE.pos.x**2 + STATE.pos.y**2 + STATE.pos.z**2);
+  
+  document.getElementById('pos-x').textContent = `${STATE.pos.x >= 0?'+':''}${STATE.pos.x.toFixed(3)} AU`;
+  document.getElementById('pos-y').textContent = `${STATE.pos.y >= 0?'+':''}${STATE.pos.y.toFixed(3)} AU`;
+  document.getElementById('pos-z').textContent = `${STATE.pos.z >= 0?'+':''}${STATE.pos.z.toFixed(3)} AU`;
+  document.getElementById('dist-sol').textContent = `${distSol.toFixed(4)} AU`;
+  document.getElementById('gal-l').textContent = `${(Math.atan2(STATE.pos.z, STATE.pos.x) * 180/Math.PI + 360).toFixed(2)}°`;
+  document.getElementById('gal-b').textContent = `${(Math.atan2(STATE.pos.y, Math.sqrt(STATE.pos.x**2+STATE.pos.z**2)) * 180/Math.PI).toFixed(2)}°`;
+  
+  const sector = distSol < 0.01 ? 'SOL SYSTEM' : 'DEEP SPACE';
+  document.getElementById('sector').textContent = sector;
+  
+  document.getElementById('vel-x').textContent = `${STATE.vel.x.toFixed(3)} km/s`;
+  document.getElementById('vel-y').textContent = `${STATE.vel.y.toFixed(3)} km/s`;
+  document.getElementById('vel-z').textContent = `${STATE.vel.z.toFixed(3)} km/s`;
+  document.getElementById('vel-total').textContent = `${velMag.toFixed(3)} km/s`;
+  document.getElementById('pct-c').textContent = `${(velMag / 299792.458 * 100).toFixed(4)}%`;
+  
+  document.getElementById('hud-vel').textContent = velMag.toFixed(3);
+  document.getElementById('hud-bear').textContent = `${((STATE.viewAngleY * 180/Math.PI + 360) % 360).toFixed(1)}°`;
+  document.getElementById('hud-fov').textContent = `${STATE.fov.toFixed(2)}°`;
+  document.getElementById('hud-throttle').textContent = `${STATE.thrustPower.toFixed(0)}%`;
+  
+  const depth = Math.abs(STATE.oceanDepth);
+  const tempC = Math.max(2, 4 - depth * 0.0003);
+  const soundSpeed = 1449.2 + 4.6 * tempC + 0.016 * depth;
+  document.getElementById('sound-speed').textContent = `${soundSpeed.toFixed(0)} m/s`;
+  document.getElementById('sofar-depth').textContent = `${depth > 600 && depth < 1200 ? '✓ ' : ''}1000 m`;
+  
+  const z = STATE.redshift;
+  document.getElementById('redshift-val').textContent = `z=${z}`;
+  document.getElementById('sound-horiz').textContent = `${(147 * z/1100).toFixed(0)} Mpc`;
+  
+  document.getElementById('bubble-r').textContent = `${(STATE.bubbleR * 1e6).toFixed(2)} μm`;
+  document.getElementById('bubble-v').textContent = `${Math.abs(STATE.bubbleV).toFixed(2)} m/s`;
+  document.getElementById('bubble-p').textContent = `${(101.325 + STATE.amplitude * 50).toFixed(1)} kPa`;
+  document.getElementById('drive-freq').textContent = `${(STATE.driveFreq/1000).toFixed(0)} kHz`;
+  
+  document.getElementById('nasa-meter').style.width = `${STATE.nasaConnected ? 85 : 0}%`;
+  
+  STATE.tick++;
+}
+
+// CONTROLS
+function thrust(dx, dy, dz) {
+  const p = STATE.thrustPower * STATE.warpFactor;
+  STATE.vel.x += dx * p;
+  STATE.vel.y += dy * p;
+  STATE.vel.z += dz * p;
+  addLog(`THRUST: [${dx>0?'+':''}${dx},${dy>0?'+':''}${dy},${dz>0?'+':''}${dz}] × ${p.toFixed(1)}`, 'info');
+}
+
+function stopThrust() {
+  STATE.vel.x *= 0.5; STATE.vel.y *= 0.5; STATE.vel.z *= 0.5;
+  addLog('THRUST REDUCED 50%', 'warn');
+}
+
+function fullStop() {
+  STATE.vel.x = 0; STATE.vel.y = 0; STATE.vel.z = 0;
+  addLog('FULL STOP ENGAGED', 'warn');
+}
+
+function scanNHI() {
+  const snr = (Math.random() * 20).toFixed(1);
+  const anomaly = Math.random() > 0.7 ? 'DETECTED' : 'NONE';
+  document.getElementById('nhi-snr').textContent = `${snr} dB`;
+  if (anomaly === 'DETECTED') {
+    addLog('⚠ NHI SIGNAL ANOMALY AT 1420 MHz!', 'warn');
+  } else {
+    addLog(`NHI SCAN: SNR=${snr}dB — NO ANOMALY`, 'data');
+  }
+}
+
+function setMode(mode) {
+  STATE.mode = mode;
+  const panelL = document.getElementById('panel-left');
+  const modeLabel = document.getElementById('mode-label');
+  if (mode === 'ocean') {
+    panelL.classList.add('ocean-mode');
+    modeLabel.textContent = 'MODE: DEEP OCEAN';
+    document.querySelector('.mode-btn.ocean').classList.add('active-ocean');
+    document.querySelector('.mode-btn.space').classList.remove('active-space');
+    STATE.pos.y = -1000;
+    addLog('SWITCHED TO OCEAN MODE', 'ocean');
+  } else {
+    panelL.classList.remove('ocean-mode');
+    modeLabel.textContent = 'MODE: DEEP SPACE';
+    document.querySelector('.mode-btn.space').classList.add('active-space');
+    document.querySelector('.mode-btn.ocean').classList.remove('active-ocean');
+    STATE.pos.y = 0;
+    addLog('SWITCHED TO SPACE MODE', 'info');
+  }
+}
+
+// NASA API INTEGRATION
+async function fetchNASACollections() {
+  addLog('QUERYING NASA CMR — CLOUD-HOSTED DATASETS...', 'nasa');
+  document.getElementById('api-status').textContent = 'QUERYING';
+  
+  try {
+    const url = 'https://cmr.earthdata.nasa.gov/search/collections.json?cloud_hosted=true&has_granules=true&page_size=10';
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${NASA_TOKEN}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
+    const data = await response.json();
+    const collections = data.feed.entry;
+    
+    STATE.nasaCollections = collections;
+    STATE.nasaConnected = true;
+    
+    document.getElementById('collection-count').textContent = `${collections.length} FOUND`;
+    document.getElementById('api-status').textContent = 'CONNECTED';
+    document.getElementById('nasa-status').textContent = 'LIVE';
+    
+    const container = document.getElementById('nasa-collections');
+    container.innerHTML = collections.map((col, idx) => `
+      <div class="nasa-collection-item" onclick="selectNASACollection(${idx})">
+        <div class="collection-title">${col.title.substring(0, 40)}...</div>
+        <div class="collection-provider">${col.data_center || 'NASA'}</div>
+      </div>
+    `).join('');
+    
+    addLog(`NASA CMR: ${collections.length} CLOUD COLLECTIONS RETRIEVED`, 'nasa');
+    addLog(`TOKEN VALID UNTIL ${new Date(1776540189000).toISOString().slice(0,10)}`, 'data');
+  } catch (error) {
+    addLog(`NASA API ERROR: ${error.message}`, 'warn');
+    document.getElementById('api-status').textContent = 'ERROR';
+    STATE.nasaConnected = false;
+  }
+}
+
+function selectNASACollection(idx) {
+  const col = STATE.nasaCollections[idx];
+  if (!col) return;
+  
+  addLog(`SELECTED: ${col.title}`, 'nasa');
+  addLog(`  PROVIDER: ${col.data_center}`, 'info');
+  addLog(`  CLOUD: ${col.cloud_hosted ? 'YES' : 'NO'}`, 'data');
+  
+  document.getElementById('info-name').textContent = col.title.substring(0, 30);
+  document.getElementById('info-type').textContent = col.data_center || 'NASA EOSDIS';
+  document.getElementById('info-dist').textContent = 'CLOUD S3';
+  document.getElementById('obj-info').classList.add('visible');
+  setTimeout(() => document.getElementById('obj-info').classList.remove('visible'), 6000);
+}
+
+async function fetchLiveEarthData() {
+  addLog('FETCHING REAL-TIME EARTH OBSERVATION DATA...', 'nasa');
+  
+  try {
+    const url = 'https://cmr.earthdata.nasa.gov/search/collections.json?keyword=real-time&cloud_hosted=true&page_size=5';
+    const response = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${NASA_TOKEN}` }
+    });
+    
+    const data = await response.json();
+    const collections = data.feed.entry;
+    
+    addLog(`REAL-TIME: ${collections.length} ACTIVE DATASETS`, 'nasa');
+    collections.slice(0, 3).forEach(col => {
+      addLog(`  • ${col.title.substring(0, 50)}`, 'data');
+    });
+  } catch (error) {
+    addLog(`EARTH DATA ERROR: ${error.message}`, 'warn');
+  }
+}
+
+async function fetchOceanData() {
+  addLog('QUERYING OCEAN & MARINE DATASETS...', 'ocean');
+  
+  try {
+    const url = 'https://cmr.earthdata.nasa.gov/search/collections.json?keyword=ocean&cloud_hosted=true&page_size=5';
+    const response = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${NASA_TOKEN}` }
+    });
+    
+    const data = await response.json();
+    const collections = data.feed.entry;
+    
+    addLog(`OCEAN: ${collections.length} MARINE DATASETS FOUND`, 'ocean');
+    collections.slice(0, 3).forEach(col => {
+      addLog(`  • ${col.title.substring(0, 50)}`, 'data');
+    });
+  } catch (error) {
+    addLog(`OCEAN DATA ERROR: ${error.message}`, 'warn');
+  }
+}
+
+// MOUSE/KEYBOARD
+mainCanvas.addEventListener('mousedown', e => {
+  STATE.isDragging = true;
+  STATE.lastMouse = { x: e.clientX, y: e.clientY };
+});
+document.addEventListener('mousemove', e => {
+  if (!STATE.isDragging) return;
+  const dx = e.clientX - STATE.lastMouse.x;
+  const dy = e.clientY - STATE.lastMouse.y;
+  STATE.viewAngleY += dx * 0.003;
+  STATE.viewAngleX += dy * 0.003;
+  STATE.lastMouse = { x: e.clientX, y: e.clientY };
+});
+document.addEventListener('mouseup', () => STATE.isDragging = false);
+
+mainCanvas.addEventListener('wheel', e => {
+  STATE.fov = Math.max(0.01, Math.min(90, STATE.fov * (e.deltaY > 0 ? 1.1 : 0.9)));
+  e.preventDefault();
+}, { passive: false });
+
+document.addEventListener('keydown', e => {
+  const p = STATE.thrustPower * STATE.warpFactor * 0.5;
+  switch(e.key) {
+    case 'ArrowUp': case 'w': thrust(0, 0, -1); break;
+    case 'ArrowDown': case 's': thrust(0, 0, 1); break;
+    case 'ArrowLeft': case 'a': thrust(-1, 0, 0); break;
+    case 'ArrowRight': case 'd': thrust(1, 0, 0); break;
+    case ' ': fullStop(); e.preventDefault(); break;
+  }
+});
+
+document.getElementById('thrust-power').addEventListener('input', e => {
+  STATE.thrustPower = parseFloat(e.target.value);
+});
+document.getElementById('warp-factor').addEventListener('input', e => {
+  STATE.warpFactor = parseFloat(e.target.value);
+});
+document.getElementById('redshift-range').addEventListener('input', e => {
+  STATE.redshift = parseInt(e.target.value);
+});
+document.getElementById('amplitude-range').addEventListener('input', e => {
+  STATE.amplitude = parseFloat(e.target.value);
+});
+document.getElementById('freq-range').addEventListener('input', e => {
+  STATE.driveFreq = parseFloat(e.target.value) * 1000;
+});
+
+// LOG
+const logs = [];
+function addLog(msg, type = 'info') {
+  const t = new Date().toISOString().slice(11,19);
+  logs.unshift({ t, msg, type });
+  if (logs.length > 50) logs.pop();
+  
+  const el = document.getElementById('log-console');
+  el.innerHTML = logs.slice(0, 12).map(l =>
+    `<div class="log-line"><span class="log-time">${l.t}</span><span class="log-${l.type}">${l.msg}</span></div>`
+  ).join('');
+}
+
+// LIVE DATA UPDATES
+function updateLiveData() {
+  const t = Date.now() * 0.001;
+  
+  const ra_h = ((STATE.viewAngleY * 180/Math.PI + 360) % 360) / 15;
+  const ra_m = (ra_h % 1) * 60;
+  const ra_s = (ra_m % 1) * 60;
+  const dec_d = STATE.viewAngleX * 180/Math.PI;
+  const dec_m = Math.abs((dec_d % 1) * 60);
+  document.getElementById('hud-ra').textContent =
+    `${Math.floor(ra_h).toString().padStart(2,'0')}h ${Math.floor(ra_m).toString().padStart(2,'0')}m ${ra_s.toFixed(0).padStart(2,'0')}s`;
+  document.getElementById('hud-dec').textContent =
+    `${dec_d>=0?'+':''}${Math.floor(dec_d).toString().padStart(3,'0')}° ${Math.floor(dec_m).toString().padStart(2,'0')}'`;
+}
+
+// MAIN LOOP
+function loop() {
+  renderStarfield();
+  if (STATE.mode === 'space') renderSpace();
+  else renderOcean();
+  renderWaveform();
+  renderSpectrum();
+  updatePhysics();
+  updateUI();
+  updateLiveData();
+  requestAnimationFrame(loop);
+}
+
+// INIT
+window.addEventListener('resize', () => { initStars(); resizeCanvases(); });
+initStars();
+resizeCanvases();
+
+addLog('PRIMORDIAL COMMAND CENTER v2.0 INITIALIZED', 'data');
+addLog('NASA EARTHDATA TOKEN: AUTHENTICATED', 'nasa');
+addLog('CMR API ENDPOINT: READY', 'nasa');
+addLog('TOKEN VALID UNTIL: 2026-08-16', 'data');
+addLog('READY FOR NASA DATA QUERIES', 'info');
+
+loop();
+
+// Auto-fetch NASA collections on startup
+setTimeout(() => fetchNASACollections(), 2000);
+</script>
+</body>
+</html>
