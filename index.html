@@ -1,0 +1,1448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PRIMORDIAL COMMAND CENTER</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600&display=swap');
+
+  :root {
+    --void: #00000a;
+    --deep: #000820;
+    --panel: rgba(0,20,60,0.85);
+    --panel-ocean: rgba(0,40,30,0.85);
+    --neon-cyan: #00f5ff;
+    --neon-blue: #0088ff;
+    --neon-green: #00ff88;
+    --neon-amber: #ffaa00;
+    --neon-red: #ff3355;
+    --neon-purple: #cc44ff;
+    --neon-ocean: #00ffcc;
+    --text-dim: rgba(0,245,255,0.4);
+    --text-mid: rgba(0,245,255,0.7);
+    --glow-cyan: 0 0 10px #00f5ff, 0 0 30px rgba(0,245,255,0.3);
+    --glow-green: 0 0 10px #00ff88, 0 0 30px rgba(0,255,136,0.3);
+    --glow-amber: 0 0 10px #ffaa00, 0 0 30px rgba(255,170,0,0.3);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--void);
+    color: var(--neon-cyan);
+    font-family: 'Share Tech Mono', monospace;
+    overflow: hidden;
+    width: 100vw; height: 100vh;
+    user-select: none;
+  }
+
+  /* STARFIELD CANVAS */
+  #starfield {
+    position: fixed; inset: 0; z-index: 0;
+  }
+
+  /* MAIN LAYOUT */
+  #app {
+    position: relative; z-index: 1;
+    display: grid;
+    grid-template-rows: 48px 1fr 180px;
+    grid-template-columns: 260px 1fr 260px;
+    width: 100vw; height: 100vh;
+    gap: 2px;
+    background: rgba(0,8,32,0.6);
+  }
+
+  /* HEADER */
+  #header {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px;
+    background: rgba(0,10,40,0.95);
+    border-bottom: 1px solid rgba(0,245,255,0.3);
+    box-shadow: 0 2px 20px rgba(0,245,255,0.1);
+  }
+
+  #header h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: 14px; font-weight: 900;
+    letter-spacing: 4px;
+    color: var(--neon-cyan);
+    text-shadow: var(--glow-cyan);
+  }
+
+  .header-status {
+    display: flex; gap: 20px; align-items: center;
+    font-size: 10px; color: var(--text-mid);
+  }
+
+  .status-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    display: inline-block; margin-right: 5px;
+    animation: pulse 2s infinite;
+  }
+  .dot-live { background: var(--neon-green); box-shadow: var(--glow-green); }
+  .dot-warn { background: var(--neon-amber); box-shadow: var(--glow-amber); animation-delay: 0.5s; }
+
+  @keyframes pulse {
+    0%,100% { opacity: 1; } 50% { opacity: 0.3; }
+  }
+
+  .mode-toggle {
+    display: flex; gap: 2px;
+  }
+  .mode-btn {
+    padding: 4px 12px; font-family: 'Orbitron', monospace;
+    font-size: 9px; font-weight: 700; letter-spacing: 2px;
+    border: 1px solid currentColor; background: transparent;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .mode-btn.space { color: var(--neon-blue); }
+  .mode-btn.ocean { color: var(--neon-ocean); }
+  .mode-btn.active-space { background: rgba(0,136,255,0.2); color: var(--neon-cyan); box-shadow: var(--glow-cyan); }
+  .mode-btn.active-ocean { background: rgba(0,255,204,0.15); color: var(--neon-ocean); box-shadow: 0 0 10px #00ffcc; }
+
+  /* LEFT PANEL */
+  #panel-left {
+    background: var(--panel);
+    border-right: 1px solid rgba(0,245,255,0.15);
+    overflow-y: auto; overflow-x: hidden;
+    padding: 10px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  #panel-left.ocean-mode { background: var(--panel-ocean); border-right-color: rgba(0,255,204,0.15); }
+
+  /* RIGHT PANEL */
+  #panel-right {
+    background: var(--panel);
+    border-left: 1px solid rgba(0,245,255,0.15);
+    overflow-y: auto; overflow-x: hidden;
+    padding: 10px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+
+  /* CENTER VIEWPORT */
+  #viewport {
+    position: relative;
+    background: var(--void);
+    overflow: hidden;
+  }
+
+  #main-canvas {
+    width: 100%; height: 100%;
+    display: block;
+  }
+
+  /* HUD overlays on canvas */
+  .hud-overlay {
+    position: absolute; pointer-events: none;
+  }
+
+  #crosshair {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px; height: 40px;
+  }
+  #crosshair::before, #crosshair::after {
+    content: '';position:absolute;background:rgba(0,245,255,0.6);
+  }
+  #crosshair::before { width:1px;height:100%;left:50%;top:0; }
+  #crosshair::after { width:100%;height:1px;top:50%;left:0; }
+
+  .crosshair-ring {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    border-radius: 50%; border: 1px solid rgba(0,245,255,0.4);
+    animation: ringpulse 3s infinite;
+  }
+  @keyframes ringpulse {
+    0%,100%{transform:translate(-50%,-50%) scale(1);opacity:0.4}
+    50%{transform:translate(-50%,-50%) scale(1.2);opacity:0.1}
+  }
+
+  #coords-hud {
+    position: absolute; bottom: 10px; left: 10px;
+    font-size: 9px; color: var(--text-mid); line-height: 1.8;
+  }
+
+  #velocity-hud {
+    position: absolute; top: 10px; right: 10px;
+    text-align: right; font-size: 9px; color: var(--text-mid); line-height: 1.8;
+  }
+
+  #target-hud {
+    position: absolute; top: 10px; left: 10px;
+    font-size: 9px; color: var(--neon-amber); line-height: 1.8;
+  }
+
+  /* BOTTOM CONTROLS */
+  #bottom-controls {
+    grid-column: 1 / -1;
+    background: rgba(0,8,28,0.95);
+    border-top: 1px solid rgba(0,245,255,0.2);
+    display: grid;
+    grid-template-columns: 1fr 300px 1fr;
+    padding: 8px 12px;
+    gap: 12px;
+    align-items: center;
+  }
+
+  /* PANEL SECTION */
+  .panel-section {
+    border: 1px solid rgba(0,245,255,0.12);
+    padding: 8px;
+    position: relative;
+  }
+  .ocean-mode .panel-section { border-color: rgba(0,255,204,0.12); }
+
+  .section-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 8px; font-weight: 700; letter-spacing: 3px;
+    color: var(--text-dim); margin-bottom: 8px;
+    border-bottom: 1px solid rgba(0,245,255,0.1);
+    padding-bottom: 4px;
+  }
+
+  .data-row {
+    display: flex; justify-content: space-between;
+    font-size: 9px; margin-bottom: 3px; color: var(--text-mid);
+  }
+  .data-val { color: var(--neon-cyan); font-weight: bold; }
+  .data-val.green { color: var(--neon-green); }
+  .data-val.amber { color: var(--neon-amber); }
+  .data-val.red { color: var(--neon-red); }
+  .data-val.purple { color: var(--neon-purple); }
+  .data-val.ocean { color: var(--neon-ocean); }
+
+  /* BAR METERS */
+  .meter-bar {
+    height: 4px; background: rgba(255,255,255,0.05);
+    margin-top: 2px; margin-bottom: 6px; position: relative;
+  }
+  .meter-fill {
+    height: 100%; transition: width 0.5s ease;
+  }
+  .meter-cyan .meter-fill { background: var(--neon-cyan); box-shadow: var(--glow-cyan); }
+  .meter-green .meter-fill { background: var(--neon-green); box-shadow: var(--glow-green); }
+  .meter-amber .meter-fill { background: var(--neon-amber); box-shadow: var(--glow-amber); }
+  .meter-red .meter-fill { background: var(--neon-red); }
+  .meter-ocean .meter-fill { background: var(--neon-ocean); }
+
+  /* CONTROLS */
+  .ctrl-label {
+    font-size: 9px; color: var(--text-dim); margin-bottom: 3px; display: block;
+  }
+
+  input[type=range] {
+    width: 100%; height: 4px; margin: 4px 0 8px;
+    -webkit-appearance: none; background: rgba(0,245,255,0.1);
+    border-radius: 2px; outline: none; cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 12px; height: 12px;
+    border-radius: 50%; background: var(--neon-cyan);
+    box-shadow: var(--glow-cyan);
+  }
+  .ocean-range::-webkit-slider-thumb { background: var(--neon-ocean) !important; }
+
+  /* PROPULSION JOYSTICK AREA */
+  #propulsion-grid {
+    display: grid; grid-template-columns: repeat(3,36px);
+    grid-template-rows: repeat(3,36px); gap: 3px;
+    justify-content: center;
+  }
+  .thrust-btn {
+    border: 1px solid rgba(0,245,255,0.3);
+    background: rgba(0,20,60,0.8);
+    color: var(--neon-cyan); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; transition: all 0.1s;
+    border-radius: 2px;
+  }
+  .thrust-btn:hover { background: rgba(0,136,255,0.3); box-shadow: var(--glow-cyan); }
+  .thrust-btn:active { background: rgba(0,245,255,0.2); transform: scale(0.95); }
+  .thrust-btn.center { font-size: 9px; font-family: 'Orbitron', monospace; letter-spacing: 1px; }
+
+  /* VELOCITY CONTROLS */
+  #vel-controls { display: flex; flex-direction: column; gap: 6px; }
+  .vel-row { display: flex; align-items: center; gap: 8px; font-size: 9px; }
+  .vel-key {
+    min-width: 55px; color: var(--text-dim);
+  }
+  .vel-display {
+    font-family: 'Orbitron', monospace; font-size: 11px;
+    color: var(--neon-cyan); min-width: 70px; text-align: right;
+  }
+
+  /* LOG CONSOLE */
+  #log-console {
+    font-size: 8px; line-height: 1.7; max-height: 100px;
+    overflow-y: auto; color: var(--text-mid);
+  }
+  .log-line { border-bottom: 1px solid rgba(0,245,255,0.03); padding: 1px 0; }
+  .log-time { color: var(--text-dim); margin-right: 6px; }
+  .log-info { color: var(--neon-cyan); }
+  .log-warn { color: var(--neon-amber); }
+  .log-data { color: var(--neon-green); }
+  .log-ocean { color: var(--neon-ocean); }
+
+  /* WAVEFORM */
+  #waveform-canvas { width: 100%; height: 40px; display: block; }
+
+  /* OBJECT LABELS on canvas */
+  .obj-tooltip {
+    position: absolute; background: rgba(0,10,30,0.9);
+    border: 1px solid rgba(0,245,255,0.3); padding: 4px 8px;
+    font-size: 8px; pointer-events: none; white-space: nowrap;
+    transform: translate(-50%, -100%) translateY(-8px);
+  }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(0,245,255,0.2); border-radius: 2px; }
+
+  /* SCAN LINES EFFECT */
+  #scanlines {
+    position: fixed; inset: 0; z-index: 100; pointer-events: none;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 4px);
+    animation: scan 8s linear infinite;
+  }
+  @keyframes scan {
+    0%{background-position:0 0} 100%{background-position:0 100%}
+  }
+
+  .live-badge {
+    font-size: 8px; padding: 2px 6px;
+    border: 1px solid var(--neon-red);
+    color: var(--neon-red); animation: pulse 1s infinite;
+    font-family: 'Orbitron', monospace; letter-spacing: 2px;
+  }
+
+  /* MINI SPECTRUM */
+  #spectrum-canvas { width: 100%; height: 30px; display: block; }
+
+  /* BOTTOM SECTIONS */
+  .bottom-section { display: flex; flex-direction: column; gap: 6px; }
+  .bottom-label {
+    font-family: 'Orbitron', monospace; font-size: 8px;
+    letter-spacing: 2px; color: var(--text-dim);
+  }
+
+  /* OBJECT INFO POPUP */
+  #obj-info {
+    position: absolute; right: 10px; bottom: 10px;
+    background: rgba(0,10,30,0.95);
+    border: 1px solid rgba(0,245,255,0.4);
+    padding: 8px 12px; font-size: 9px;
+    min-width: 180px; max-width: 220px;
+    display: none;
+    box-shadow: var(--glow-cyan);
+  }
+  #obj-info.visible { display: block; }
+  #obj-info h3 {
+    font-family: 'Orbitron', monospace; font-size: 10px;
+    color: var(--neon-cyan); margin-bottom: 6px;
+  }
+
+  select {
+    background: rgba(0,20,60,0.9); color: var(--neon-cyan);
+    border: 1px solid rgba(0,245,255,0.3); padding: 3px 6px;
+    font-family: 'Share Tech Mono', monospace; font-size: 9px;
+    width: 100%; margin-bottom: 6px; outline: none; cursor: pointer;
+  }
+  select option { background: #001030; }
+
+  .btn-small {
+    padding: 4px 8px; font-family: 'Orbitron', monospace;
+    font-size: 8px; letter-spacing: 1px; font-weight: 700;
+    border: 1px solid currentColor; background: transparent;
+    cursor: pointer; transition: all 0.15s; width: 100%; margin-bottom: 3px;
+  }
+  .btn-cyan { color: var(--neon-cyan); }
+  .btn-cyan:hover { background: rgba(0,245,255,0.15); box-shadow: var(--glow-cyan); }
+  .btn-green { color: var(--neon-green); }
+  .btn-green:hover { background: rgba(0,255,136,0.1); box-shadow: var(--glow-green); }
+  .btn-amber { color: var(--neon-amber); }
+  .btn-amber:hover { background: rgba(255,170,0,0.1); box-shadow: var(--glow-amber); }
+  .btn-ocean { color: var(--neon-ocean); }
+  .btn-ocean:hover { background: rgba(0,255,204,0.1); box-shadow: 0 0 10px #00ffcc; }
+
+</style>
+</head>
+<body>
+
+<canvas id="starfield"></canvas>
+<div id="scanlines"></div>
+
+<div id="app">
+  <!-- HEADER -->
+  <header id="header">
+    <h1>⬡ PRIMORDIAL COMMAND CENTER</h1>
+    <div class="header-status">
+      <span><span class="status-dot dot-live"></span>LIVE FEED</span>
+      <span id="live-time">00:00:00 UTC</span>
+      <span><span class="status-dot dot-warn"></span>HUBBLE API</span>
+      <span id="mode-label">MODE: DEEP SPACE</span>
+      <div class="live-badge">● REC</div>
+    </div>
+    <div class="mode-toggle">
+      <button class="mode-btn space active-space" onclick="setMode('space')">⚫ SPACE</button>
+      <button class="mode-btn ocean" onclick="setMode('ocean')">🌊 OCEAN</button>
+    </div>
+  </header>
+
+  <!-- LEFT PANEL -->
+  <div id="panel-left">
+
+    <div class="panel-section" id="nav-section">
+      <div class="section-title">◈ NAVIGATION &amp; POSITION</div>
+      <div class="data-row"><span>X COORD</span><span class="data-val" id="pos-x">+0.000 AU</span></div>
+      <div class="data-row"><span>Y COORD</span><span class="data-val" id="pos-y">+0.000 AU</span></div>
+      <div class="data-row"><span>Z COORD</span><span class="data-val" id="pos-z">+0.000 AU</span></div>
+      <div class="data-row"><span>DIST SOL</span><span class="data-val green" id="dist-sol">0.00 LY</span></div>
+      <div class="data-row"><span>GALACTIC L</span><span class="data-val amber" id="gal-l">0.00°</span></div>
+      <div class="data-row"><span>GALACTIC B</span><span class="data-val amber" id="gal-b">0.00°</span></div>
+      <div class="data-row"><span>SECTOR</span><span class="data-val purple" id="sector">SOL SYSTEM</span></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">◈ VELOCITY &amp; PROPULSION</div>
+      <div class="data-row"><span>VX</span><span class="data-val" id="vel-x">0.000 km/s</span></div>
+      <div class="data-row"><span>VY</span><span class="data-val" id="vel-y">0.000 km/s</span></div>
+      <div class="data-row"><span>VZ</span><span class="data-val" id="vel-z">0.000 km/s</span></div>
+      <div class="data-row"><span>TOTAL V</span><span class="data-val green" id="vel-total">0.000 km/s</span></div>
+      <div class="data-row"><span>ACCEL</span><span class="data-val amber" id="accel-val">0.00 m/s²</span></div>
+      <div class="data-row"><span>% OF C</span><span class="data-val purple" id="pct-c">0.000%</span></div>
+      <br>
+      <label class="ctrl-label">THRUST POWER</label>
+      <input type="range" id="thrust-power" min="0.1" max="100" value="1" step="0.1">
+      <label class="ctrl-label">WARP FACTOR</label>
+      <input type="range" id="warp-factor" min="1" max="10" value="1" step="0.1">
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">◈ ENVIRONMENT SCAN</div>
+      <div class="data-row"><span>TEMP</span><span class="data-val" id="env-temp">2.725 K</span></div>
+      <div class="data-row"><span>PRESSURE</span><span class="data-val amber" id="env-press">10⁻¹⁷ Pa</span></div>
+      <div class="data-row"><span>RADIATION</span><span class="data-val red" id="env-rad">0.12 Sv/hr</span></div>
+      <div class="data-row"><span>GRAVITY</span><span class="data-val green" id="env-grav">≈ 0 g</span></div>
+      <div class="data-row"><span>DENSITY</span><span class="data-val" id="env-dens">~5 H/m³</span></div>
+      <div class="meter-bar meter-cyan"><div class="meter-fill" id="rad-meter" style="width:12%"></div></div>
+      <div class="data-row"><span>MAGNETIC</span><span class="data-val purple" id="env-mag">0.1 nT</span></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">◈ ACOUSTIC SPECTRUM</div>
+      <canvas id="spectrum-canvas"></canvas>
+      <div class="data-row" style="margin-top:4px"><span>SOFAR DEPTH</span><span class="data-val ocean" id="sofar-depth">1000 m</span></div>
+      <div class="data-row"><span>SOUND SPEED</span><span class="data-val ocean" id="sound-speed">1500 m/s</span></div>
+      <div class="data-row"><span>PROP RANGE</span><span class="data-val green" id="prop-range">25000 km</span></div>
+    </div>
+
+  </div>
+
+  <!-- CENTER VIEWPORT -->
+  <div id="viewport">
+    <canvas id="main-canvas"></canvas>
+
+    <!-- Crosshair -->
+    <div id="crosshair">
+      <div class="crosshair-ring" style="width:20px;height:20px"></div>
+      <div class="crosshair-ring" style="width:60px;height:60px;animation-delay:1s"></div>
+      <div class="crosshair-ring" style="width:100px;height:100px;animation-delay:2s"></div>
+    </div>
+
+    <div id="coords-hud">
+      <div>RA: <span id="hud-ra">00h 00m 00s</span></div>
+      <div>DEC: <span id="hud-dec">+00° 00' 00"</span></div>
+      <div>EPOCH: J2000.0</div>
+      <div>FOV: <span id="hud-fov">1.00°</span></div>
+    </div>
+
+    <div id="velocity-hud">
+      <div>V_TOT: <span id="hud-vel">0.000</span> km/s</div>
+      <div>BEARING: <span id="hud-bear">000.0°</span></div>
+      <div>ALTITUDE: <span id="hud-alt">—</span></div>
+      <div>THROTTLE: <span id="hud-throttle">0%</span></div>
+    </div>
+
+    <div id="target-hud">
+      <div>TARGET LOCK: <span id="target-name">NONE</span></div>
+      <div>DIST: <span id="target-dist">—</span></div>
+      <div>TYPE: <span id="target-type">—</span></div>
+    </div>
+
+    <div id="obj-info">
+      <h3 id="info-name">—</h3>
+      <div class="data-row"><span>TYPE</span><span class="data-val" id="info-type">—</span></div>
+      <div class="data-row"><span>DISTANCE</span><span class="data-val" id="info-dist">—</span></div>
+      <div class="data-row"><span>MASS</span><span class="data-val" id="info-mass">—</span></div>
+      <div class="data-row"><span>TEMP</span><span class="data-val" id="info-temp">—</span></div>
+      <div class="data-row"><span>RADIUS</span><span class="data-val" id="info-radius">—</span></div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div id="panel-right">
+
+    <div class="panel-section">
+      <div class="section-title">◈ TARGET SELECTION</div>
+      <select id="target-select" onchange="selectTarget(this.value)">
+        <optgroup label="SOLAR SYSTEM">
+          <option value="sun">☀ SUN</option>
+          <option value="mercury">MERCURY</option>
+          <option value="venus">VENUS</option>
+          <option value="earth">EARTH</option>
+          <option value="mars">MARS</option>
+          <option value="jupiter">JUPITER</option>
+          <option value="saturn">SATURN</option>
+          <option value="uranus">URANUS</option>
+          <option value="neptune">NEPTUNE</option>
+        </optgroup>
+        <optgroup label="DEEP SPACE">
+          <option value="proxima">PROXIMA CENTAURI</option>
+          <option value="sagittarius">SGR A* (GALACTIC CENTER)</option>
+          <option value="andromeda">ANDROMEDA GALAXY</option>
+          <option value="betelgeuse">BETELGEUSE</option>
+          <option value="crab">CRAB NEBULA</option>
+          <option value="m87">M87 BLACK HOLE</option>
+        </optgroup>
+        <optgroup label="OCEAN ZONES">
+          <option value="sofar">SOFAR CHANNEL</option>
+          <option value="mariana">MARIANA TRENCH</option>
+          <option value="mh370">MH370 ZONE</option>
+          <option value="hydrothermal">HYDROTHERMAL VENT</option>
+        </optgroup>
+      </select>
+      <button class="btn-small btn-cyan" onclick="lockTarget()">⊕ LOCK TARGET</button>
+      <button class="btn-small btn-amber" onclick="navigateTo()">▶ AUTO-NAVIGATE</button>
+      <button class="btn-small btn-green" onclick="scanTarget()">◎ DEEP SCAN</button>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">◈ HUBBLE LIVE DATA</div>
+      <div class="data-row"><span>STATUS</span><span class="data-val green" id="hubble-status">ONLINE</span></div>
+      <div class="data-row"><span>POINTING</span><span class="data-val" id="hubble-point">HDF NORTH</span></div>
+      <div class="data-row"><span>INSTRUMENT</span><span class="data-val amber" id="hubble-inst">ACS/WFC</span></div>
+      <div class="data-row"><span>EXPOSURE</span><span class="data-val" id="hubble-exp">2400s</span></div>
+      <div class="data-row"><span>ORBIT</span><span class="data-val purple" id="hubble-orbit">#17,449</span></div>
+      <div class="data-row"><span>ALT</span><span class="data-val green">547 km</span></div>
+      <div class="meter-bar meter-green">
+        <div class="meter-fill" id="hubble-meter" style="width:85%"></div>
+      </div>
+      <button class="btn-small btn-green" onclick="fetchHubbleData()" style="margin-top:4px">⟳ FETCH LATEST IMG</button>
+      <div id="hubble-img-area" style="margin-top:6px;font-size:8px;color:var(--text-dim);text-align:center">
+        [AWAITING FEED]
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">◈ PRIMORDIAL ACOUSTICS</div>
+      <canvas id="waveform-canvas"></canvas>
+      <div class="data-row" style="margin-top:4px"><span>CMB TEMP</span><span class="data-val">2.725 K</span></div>
+      <div class="data-row"><span>SOUND HORIZ</span><span class="data-val green" id="sound-horiz">147 Mpc</span></div>
+      <div class="data-row"><span>REDSHIFT</span><span class="data-val amber" id="redshift-val">z=1100</span></div>
+      <div class="data-row"><span>FREQUENCY</span><span class="data-val purple" id="acoustic-freq">173 MHz</span></div>
+      <label class="ctrl-label" style="margin-top:4px">REDSHIFT PROBE</label>
+      <input type="range" id="redshift-range" min="0" max="1100" value="1100" step="10">
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">◈ CAVITATION DYNAMICS</div>
+      <div class="data-row"><span>BUBBLE R</span><span class="data-val" id="bubble-r">5.00 μm</span></div>
+      <div class="data-row"><span>COLLAPSE V</span><span class="data-val red" id="bubble-v">0.00 m/s</span></div>
+      <div class="data-row"><span>PRESSURE</span><span class="data-val amber" id="bubble-p">101.3 kPa</span></div>
+      <div class="data-row"><span>TEMP SPIKE</span><span class="data-val red" id="bubble-t">~5000 K</span></div>
+      <div class="meter-bar meter-amber">
+        <div class="meter-fill" id="bubble-meter" style="width:30%"></div>
+      </div>
+      <label class="ctrl-label">ACOUSTIC AMPLITUDE</label>
+      <input type="range" id="amplitude-range" min="0.1" max="3.0" value="1.5" step="0.1">
+      <label class="ctrl-label">DRIVE FREQUENCY (kHz)</label>
+      <input type="range" id="freq-range" min="1" max="100" value="20" step="1">
+      <div class="data-row"><span>DRIVE FREQ</span><span class="data-val ocean" id="drive-freq">20 kHz</span></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">◈ NHI SIGNAL MONITOR</div>
+      <div class="data-row"><span>H-LINE</span><span class="data-val green">1420.41 MHz</span></div>
+      <div class="data-row"><span>WATER HOLE</span><span class="data-val ocean">1420–1727 MHz</span></div>
+      <div class="data-row"><span>PRIME SEQ</span><span class="data-val purple" id="prime-display">2,3,5,7,11...</span></div>
+      <div class="data-row"><span>SIGNAL SNR</span><span class="data-val" id="nhi-snr">—</span></div>
+      <div class="data-row"><span>ANOMALY</span><span class="data-val amber" id="nhi-anomaly">NONE</span></div>
+      <button class="btn-small btn-green" onclick="scanNHI()" style="margin-top:4px">◉ SCAN NHI FREQ</button>
+    </div>
+
+  </div>
+
+  <!-- BOTTOM CONTROLS -->
+  <div id="bottom-controls">
+
+    <div class="bottom-section">
+      <div class="bottom-label">MANUAL PROPULSION</div>
+      <div style="display:flex;gap:16px;align-items:center">
+        <div id="propulsion-grid">
+          <div></div>
+          <button class="thrust-btn" onclick="thrust(0,-1,0)" title="Pitch Up">↑</button>
+          <div></div>
+          <button class="thrust-btn" onclick="thrust(-1,0,0)" title="Yaw Left">←</button>
+          <button class="thrust-btn center" onclick="stopThrust()" title="STOP">STOP</button>
+          <button class="thrust-btn" onclick="thrust(1,0,0)" title="Yaw Right">→</button>
+          <div></div>
+          <button class="thrust-btn" onclick="thrust(0,1,0)" title="Pitch Down">↓</button>
+          <div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <button class="thrust-btn" style="width:80px;font-size:10px" onclick="thrust(0,0,-1)">▲ FWD</button>
+          <button class="thrust-btn" style="width:80px;font-size:10px" onclick="thrust(0,0,1)">▼ REV</button>
+          <button class="thrust-btn" style="width:80px;font-size:8px;color:var(--neon-amber)" onclick="fullStop()">⊗ FULL STOP</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-section" style="align-items:center">
+      <div class="bottom-label" style="text-align:center">SYSTEM STATUS</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;font-size:9px;margin-top:4px">
+        <div class="data-row"><span>SHIELDS</span><span class="data-val green">100%</span></div>
+        <div class="data-row"><span>POWER</span><span class="data-val green" id="sys-power">98.7%</span></div>
+        <div class="data-row"><span>HULL</span><span class="data-val green">100%</span></div>
+        <div class="data-row"><span>SENSORS</span><span class="data-val green">NOMINAL</span></div>
+        <div class="data-row"><span>LIFE SUP</span><span class="data-val green">ACTIVE</span></div>
+        <div class="data-row"><span>COMMS</span><span class="data-val amber">PARTIAL</span></div>
+      </div>
+    </div>
+
+    <div class="bottom-section">
+      <div class="bottom-label">MISSION LOG</div>
+      <div id="log-console"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  PRIMORDIAL COMMAND CENTER - CORE ENGINE
+//  Evie Kranjak Research Toolkit
+// ═══════════════════════════════════════════════════════════════
+
+const STATE = {
+  mode: 'space',
+  pos: { x: 0, y: 0, z: 0 },
+  vel: { x: 0, y: 0, z: 0 },
+  targetLocked: null,
+  warpFactor: 1,
+  thrustPower: 1,
+  redshift: 1100,
+  amplitude: 1.5,
+  driveFreq: 20000,
+  autoNav: false,
+  navTarget: null,
+  tick: 0,
+  fov: 1.0,
+  bearing: 0,
+  viewAngleX: 0,
+  viewAngleY: 0,
+  bubbleR: 5e-6,
+  bubbleV: 0,
+  oceanDepth: 0,
+  isDragging: false,
+  lastMouse: { x: 0, y: 0 }
+};
+
+// CELESTIAL OBJECTS DATABASE
+const OBJECTS = {
+  sun:        { name: 'SUN', type: 'G-TYPE STAR', x: 0, y: 0, z: 0, mass: '1.989×10³⁰ kg', temp: '5778 K', radius: '696,000 km', dist: '0 AU', color: '#ffdd44', size: 18, glyph: '☀' },
+  mercury:    { name: 'MERCURY', type: 'ROCKY PLANET', x: 0.39, y: 0, z: 0.01, mass: '3.3×10²³ kg', temp: '430 K', radius: '2,440 km', dist: '0.39 AU', color: '#aaa', size: 4 },
+  venus:      { name: 'VENUS', type: 'ROCKY PLANET', x: 0.72, y: 0.1, z: -0.02, mass: '4.87×10²⁴ kg', temp: '737 K', radius: '6,051 km', dist: '0.72 AU', color: '#ffcc88', size: 7 },
+  earth:      { name: 'EARTH', type: 'HABITABLE PLANET', x: 1.0, y: 0, z: 0, mass: '5.97×10²⁴ kg', temp: '288 K', radius: '6,371 km', dist: '1.00 AU', color: '#4488ff', size: 8, glyph: '⊕' },
+  mars:       { name: 'MARS', type: 'ROCKY PLANET', x: 1.52, y: -0.15, z: 0.03, mass: '6.42×10²³ kg', temp: '210 K', radius: '3,390 km', dist: '1.52 AU', color: '#ff6633', size: 5 },
+  jupiter:    { name: 'JUPITER', type: 'GAS GIANT', x: 5.2, y: 0.3, z: -0.1, mass: '1.9×10²⁷ kg', temp: '165 K', radius: '71,492 km', dist: '5.20 AU', color: '#ffaa66', size: 14 },
+  saturn:     { name: 'SATURN', type: 'GAS GIANT (RINGS)', x: 9.5, y: -0.4, z: 0.15, mass: '5.68×10²⁶ kg', temp: '134 K', radius: '58,232 km', dist: '9.58 AU', color: '#ffddaa', size: 12 },
+  uranus:     { name: 'URANUS', type: 'ICE GIANT', x: 19.2, y: 0.6, z: -0.2, mass: '8.68×10²⁵ kg', temp: '76 K', radius: '25,362 km', dist: '19.2 AU', color: '#88ffee', size: 9 },
+  neptune:    { name: 'NEPTUNE', type: 'ICE GIANT', x: 30.1, y: -0.7, z: 0.3, mass: '1.02×10²⁶ kg', temp: '72 K', radius: '24,622 km', dist: '30.1 AU', color: '#4455ff', size: 9 },
+  proxima:    { name: 'PROXIMA CENTAURI', type: 'M-DWARF STAR', x: 268000, y: 1200, z: -800, mass: '2.4×10²⁹ kg', temp: '3042 K', radius: '107,000 km', dist: '4.24 LY', color: '#ff4422', size: 6 },
+  sagittarius:{ name: 'SGR A*', type: 'SUPERMASSIVE BLACK HOLE', x: 1.7e9, y: -1.2e7, z: 2.1e7, mass: '4×10³⁶ kg', temp: '~10¹⁰ K', radius: '12,000,000 km', dist: '26,000 LY', color: '#ffaa00', size: 12 },
+  andromeda:  { name: 'ANDROMEDA GALAXY', type: 'SPIRAL GALAXY', x: 2.4e13, y: 1.2e12, z: -8e11, mass: '~10¹² M☉', temp: '—', radius: '110,000 LY', dist: '2.537 MLY', color: '#aaddff', size: 20 },
+  betelgeuse: { name: 'BETELGEUSE', type: 'RED SUPERGIANT', x: 5.8e7, y: 2.1e6, z: -1.3e6, mass: '1.17×10³¹ kg', temp: '3500 K', radius: '887 R☉', dist: '700 LY', color: '#ff6600', size: 16 },
+  crab:       { name: 'CRAB NEBULA', type: 'SUPERNOVA REMNANT', x: 1.97e9, y: 3.2e7, z: -1.5e8, mass: '~0.5 M☉', temp: '~11,000 K', radius: '11 LY', dist: '6,500 LY', color: '#ff99cc', size: 15 },
+  m87:        { name: 'M87 BLACK HOLE', type: 'ULTRAMASSIVE BH', x: 5.1e13, y: -2.3e12, z: 1.7e12, mass: '6.5×10³⁹ kg', temp: '~10¹³ K', radius: '~3.6 LY', dist: '53.5 MLY', color: '#ffcc00', size: 18 },
+  sofar:      { name: 'SOFAR CHANNEL', type: 'ACOUSTIC WAVEGUIDE', x: 0, y: -1000, z: 0, mass: '—', temp: '4°C', radius: '600–1200m depth', dist: '~1000m depth', color: '#00ffcc', size: 10 },
+  mariana:    { name: 'MARIANA TRENCH', type: 'OCEAN DEEP', x: 142, y: -11034, z: 11, mass: '—', temp: '1-4°C', radius: '2,550 km long', dist: '11,034m depth', color: '#0066ff', size: 8 },
+  mh370:      { name: 'MH370 IMPACT ZONE', type: 'ACOUSTIC EVENT', x: 92.8, y: -4000, z: -35.6, mass: '—', temp: '2°C', radius: '~Broken Ridge', dist: '4000m depth', color: '#ff3355', size: 7 },
+  hydrothermal:{ name: 'HYDROTHERMAL VENT', type: 'CHEMOSYNTHETIC ZONE', x: 0, y: -2500, z: 0, mass: '—', temp: '400°C', radius: '~1m diameter', dist: '2500m depth', color: '#ff6600', size: 6 },
+};
+
+// HUBBLE PROGRAM DATA
+const HUBBLE_PROGRAMS = [
+  { pointing: 'HDF NORTH', instrument: 'ACS/WFC', exposure: '2400s' },
+  { pointing: 'NGC 4321', instrument: 'WFC3/UVIS', exposure: '1800s' },
+  { pointing: 'PROX CEN B', instrument: 'STIS', exposure: '3600s' },
+  { pointing: 'M51 GALAXY', instrument: 'ACS/WFC', exposure: '1200s' },
+  { pointing: 'CRAB NEBULA', instrument: 'WFC3/IR', exposure: '900s' },
+  { pointing: 'PILLARS-EAGLE', instrument: 'WFC3/UVIS', exposure: '5400s' },
+];
+
+// ═══════════════════════════════════════════════════════════════
+// STARFIELD RENDERER
+// ═══════════════════════════════════════════════════════════════
+const sfCanvas = document.getElementById('starfield');
+const sfCtx = sfCanvas.getContext('2d');
+let stars = [];
+
+function initStars() {
+  sfCanvas.width = window.innerWidth;
+  sfCanvas.height = window.innerHeight;
+  stars = Array.from({length: 800}, () => ({
+    x: Math.random() * sfCanvas.width,
+    y: Math.random() * sfCanvas.height,
+    r: Math.random() * 1.5,
+    brightness: Math.random(),
+    twinkle: Math.random() * Math.PI * 2,
+    speed: Math.random() * 0.3 + 0.05
+  }));
+}
+
+function renderStarfield() {
+  sfCtx.clearRect(0, 0, sfCanvas.width, sfCanvas.height);
+  const t = Date.now() * 0.001;
+  const velMag = Math.sqrt(STATE.vel.x**2 + STATE.vel.y**2 + STATE.vel.z**2);
+
+  stars.forEach(s => {
+    const tw = 0.7 + 0.3 * Math.sin(t * s.speed + s.twinkle);
+    sfCtx.beginPath();
+    sfCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    const alpha = s.brightness * tw;
+    sfCtx.fillStyle = `rgba(200,220,255,${alpha})`;
+    sfCtx.fill();
+
+    // Streak effect when moving fast
+    if (velMag > 100) {
+      const streakLen = Math.min(velMag * 0.005, 20);
+      sfCtx.beginPath();
+      sfCtx.moveTo(s.x, s.y);
+      sfCtx.lineTo(s.x - STATE.vel.x * 0.0002 * streakLen, s.y - STATE.vel.z * 0.0002 * streakLen);
+      sfCtx.strokeStyle = `rgba(180,210,255,${alpha * 0.3})`;
+      sfCtx.lineWidth = s.r * 0.5;
+      sfCtx.stroke();
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN VIEWPORT RENDERER
+// ═══════════════════════════════════════════════════════════════
+const mainCanvas = document.getElementById('main-canvas');
+const ctx = mainCanvas.getContext('2d');
+
+function resizeCanvases() {
+  const vp = document.getElementById('viewport');
+  mainCanvas.width = vp.clientWidth;
+  mainCanvas.height = vp.clientHeight;
+}
+
+function worldToScreen(wx, wy, wz) {
+  const cx = mainCanvas.width / 2;
+  const cy = mainCanvas.height / 2;
+  const scale = 50 / STATE.fov;
+
+  // Rotate by view angles
+  const cosX = Math.cos(STATE.viewAngleX), sinX = Math.sin(STATE.viewAngleX);
+  const cosY = Math.cos(STATE.viewAngleY), sinY = Math.sin(STATE.viewAngleY);
+
+  let rx = wx - STATE.pos.x;
+  let ry = wy - STATE.pos.y;
+  let rz = wz - STATE.pos.z;
+
+  // Simple perspective
+  const ry2 = ry * cosX - rz * sinX;
+  const rz2 = ry * sinX + rz * cosX;
+  const rx3 = rx * cosY + rz2 * sinY;
+  const rz3 = -rx * sinY + rz2 * cosY;
+
+  const depth = rz3 + 0.001;
+  const sx = cx + (rx3 / (depth * 0.001 + 1)) * scale;
+  const sy = cy + (ry2 / (depth * 0.001 + 1)) * scale;
+  return { sx, sy, depth: rz3 };
+}
+
+function renderSpace() {
+  const W = mainCanvas.width, H = mainCanvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Deep space gradient
+  const grad = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, W/1.5);
+  grad.addColorStop(0, 'rgba(0,10,30,0.8)');
+  grad.addColorStop(1, 'rgba(0,0,8,0.95)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Milky Way band
+  const mwGrad = ctx.createLinearGradient(0, H*0.3, W, H*0.7);
+  mwGrad.addColorStop(0, 'rgba(100,120,180,0)');
+  mwGrad.addColorStop(0.5, 'rgba(100,120,180,0.04)');
+  mwGrad.addColorStop(1, 'rgba(100,120,180,0)');
+  ctx.fillStyle = mwGrad;
+  ctx.fillRect(0, H*0.25, W, H*0.5);
+
+  const t = Date.now() * 0.001;
+
+  // Draw grid lines
+  ctx.strokeStyle = 'rgba(0,245,255,0.03)';
+  ctx.lineWidth = 0.5;
+  const gridStep = mainCanvas.width / 8;
+  for (let x = 0; x <= W; x += gridStep) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let y = 0; y <= H; y += gridStep) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  // Draw objects
+  const sortedObjs = Object.entries(OBJECTS).sort((a,b) => {
+    const pa = worldToScreen(a[1].x, a[1].y, a[1].z);
+    const pb = worldToScreen(b[1].x, b[1].y, b[1].z);
+    return pb.depth - pa.depth;
+  });
+
+  sortedObjs.forEach(([key, obj]) => {
+    const { sx, sy, depth } = worldToScreen(obj.x, obj.y, obj.z);
+    if (sx < -50 || sx > W+50 || sy < -50 || sy > H+50) return;
+
+    const fade = Math.max(0, Math.min(1, 1 - depth * 0.00001));
+    const isTarget = STATE.targetLocked === key;
+    const r = obj.size || 6;
+
+    // Glow
+    const glowGrad = ctx.createRadialGradient(sx, sy, 0, sx, sy, r * 4);
+    glowGrad.addColorStop(0, obj.color + '66');
+    glowGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = glowGrad;
+    ctx.beginPath();
+    ctx.arc(sx, sy, r * 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Body
+    ctx.beginPath();
+    ctx.arc(sx, sy, r, 0, Math.PI * 2);
+    ctx.fillStyle = obj.color;
+    ctx.fill();
+
+    // Target indicator
+    if (isTarget) {
+      ctx.strokeStyle = '#00f5ff';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.arc(sx, sy, r + 10 + Math.sin(t * 3) * 3, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Corner brackets
+      const bs = r + 18;
+      ctx.strokeStyle = '#00f5ff';
+      ctx.lineWidth = 1;
+      [[sx-bs,sy-bs],[sx+bs,sy-bs],[sx+bs,sy+bs],[sx-bs,sy+bs]].forEach(([bx,by],i) => {
+        ctx.beginPath();
+        const dx = i < 2 ? 8 : -8, dy = i===0||i===3 ? 8 : -8;
+        ctx.moveTo(bx, by); ctx.lineTo(bx+dx, by);
+        ctx.moveTo(bx, by); ctx.lineTo(bx, by+dy);
+        ctx.stroke();
+      });
+    }
+
+    // Label
+    ctx.fillStyle = `rgba(0,245,255,${0.6 * fade})`;
+    ctx.font = '8px Share Tech Mono';
+    ctx.fillText(obj.name, sx + r + 4, sy + 3);
+
+    // Saturn rings
+    if (key === 'saturn') {
+      ctx.strokeStyle = 'rgba(255,221,170,0.4)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, r * 2.5, r * 0.6, 0.3, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Black hole accretion disk
+    if (key === 'sagittarius' || key === 'm87') {
+      ctx.strokeStyle = 'rgba(255,170,0,0.5)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, r * 2.8, r * 0.5, t * 0.2, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  });
+
+  // Scan sweep
+  const sweepAngle = (t * 0.5) % (Math.PI * 2);
+  ctx.beginPath();
+  ctx.moveTo(W/2, H/2);
+  ctx.arc(W/2, H/2, Math.min(W,H)/2, sweepAngle, sweepAngle + 0.3);
+  ctx.closePath();
+  const sweepGrad = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.min(W,H)/2);
+  sweepGrad.addColorStop(0, 'transparent');
+  sweepGrad.addColorStop(1, 'rgba(0,245,255,0.03)');
+  ctx.fillStyle = sweepGrad;
+  ctx.fill();
+}
+
+function renderOcean() {
+  const W = mainCanvas.width, H = mainCanvas.height;
+  ctx.clearRect(0, 0, W, H);
+  const t = Date.now() * 0.001;
+  const depth = Math.abs(STATE.oceanDepth);
+
+  // Deep water gradient
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  if (depth < 200) {
+    grad.addColorStop(0, '#001830'); grad.addColorStop(1, '#003050');
+  } else if (depth < 1000) {
+    grad.addColorStop(0, '#000d20'); grad.addColorStop(1, '#002040');
+  } else if (depth < 4000) {
+    grad.addColorStop(0, '#000510'); grad.addColorStop(1, '#001020');
+  } else {
+    grad.addColorStop(0, '#000008'); grad.addColorStop(1, '#000510');
+  }
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Bioluminescence particles
+  for (let i = 0; i < 30; i++) {
+    const px = (Math.sin(t * 0.3 + i * 2.1) * 0.5 + 0.5) * W;
+    const py = (Math.sin(t * 0.2 + i * 3.3) * 0.5 + 0.5) * H;
+    const bright = Math.sin(t * 1.5 + i) * 0.5 + 0.5;
+    const r = 2 + bright * 3;
+    ctx.beginPath();
+    ctx.arc(px, py, r, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(0,255,200,${bright * 0.6})`;
+    ctx.fill();
+  }
+
+  // SOFAR channel band
+  if (depth > 600 && depth < 1200) {
+    const bandGrad = ctx.createLinearGradient(0, 0, 0, H);
+    bandGrad.addColorStop(0, 'transparent');
+    bandGrad.addColorStop(0.4, 'rgba(0,255,204,0.06)');
+    bandGrad.addColorStop(0.6, 'rgba(0,255,204,0.1)');
+    bandGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = bandGrad;
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(0,255,204,0.6)';
+    ctx.font = '10px Orbitron';
+    ctx.fillText('◈ SOFAR CHANNEL ACTIVE', 10, H/2);
+  }
+
+  // Sound wave propagation rings
+  const numRings = 5;
+  for (let i = 0; i < numRings; i++) {
+    const phase = ((t * 0.4 + i / numRings) % 1);
+    const radius = phase * W * 0.8;
+    ctx.beginPath();
+    ctx.ellipse(W/2, H/2, radius, radius * 0.3, 0, 0, Math.PI*2);
+    ctx.strokeStyle = `rgba(0,255,204,${(1-phase) * 0.3})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // Ocean grid
+  ctx.strokeStyle = 'rgba(0,255,204,0.04)';
+  ctx.lineWidth = 0.5;
+  for (let x = 0; x < W; x += W/10) {
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+  }
+  for (let y = 0; y < H; y += H/8) {
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+  }
+
+  // MH370 marker
+  const mhX = W * 0.6, mhY = H * 0.5;
+  ctx.beginPath();
+  ctx.arc(mhX, mhY, 8, 0, Math.PI*2);
+  ctx.fillStyle = '#ff3355';
+  ctx.fill();
+  ctx.strokeStyle = `rgba(255,51,85,${0.5 + 0.5 * Math.sin(t*2)})`;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([3,3]);
+  ctx.beginPath();
+  ctx.arc(mhX, mhY, 20 + Math.sin(t)*5, 0, Math.PI*2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(255,51,85,0.7)';
+  ctx.font = '8px Share Tech Mono';
+  ctx.fillText('MH370 ZONE', mhX+12, mhY+3);
+
+  // Hydrophone lines
+  [
+    { name:'DIEGO GARCIA', px: W*0.2, py: H*0.25 },
+    { name:'CAPE LEEUWIN', px: W*0.85, py: H*0.55 }
+  ].forEach(h => {
+    ctx.beginPath();
+    ctx.moveTo(h.px, h.py); ctx.lineTo(mhX, mhY);
+    ctx.strokeStyle = `rgba(0,255,204,${0.3 + 0.2*Math.sin(t*1.5)})`;
+    ctx.lineWidth = 0.8;
+    ctx.setLineDash([5,5]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(h.px, h.py, 5, 0, Math.PI*2);
+    ctx.fillStyle = '#00ffcc';
+    ctx.fill();
+    ctx.fillStyle = 'rgba(0,255,204,0.7)';
+    ctx.font = '7px Share Tech Mono';
+    ctx.fillText(h.name, h.px+8, h.py+3);
+  });
+
+  // Depth label
+  ctx.fillStyle = 'rgba(0,255,204,0.5)';
+  ctx.font = '9px Share Tech Mono';
+  ctx.fillText(`DEPTH: ${depth.toFixed(0)}m`, 10, H-10);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WAVEFORM RENDERER
+// ═══════════════════════════════════════════════════════════════
+const wfCanvas = document.getElementById('waveform-canvas');
+const wfCtx = wfCanvas.getContext('2d');
+
+function renderWaveform() {
+  const W = 230, H = 40;
+  wfCanvas.width = W; wfCanvas.height = H;
+  wfCtx.clearRect(0,0,W,H);
+  const t = Date.now() * 0.001;
+  const z = STATE.redshift / 1100;
+
+  wfCtx.beginPath();
+  for (let x = 0; x < W; x++) {
+    const phase = (x / W) * Math.PI * 8 * z;
+    const y = H/2 + Math.sin(phase + t * 2) * (H/2 - 4) * 0.6
+                   + Math.sin(phase * 2.3 + t) * (H/2 - 4) * 0.25
+                   + Math.sin(phase * 5.1 - t * 0.7) * (H/2 - 4) * 0.15;
+    if (x === 0) wfCtx.moveTo(x, y); else wfCtx.lineTo(x, y);
+  }
+  wfCtx.strokeStyle = '#cc44ff';
+  wfCtx.lineWidth = 1.5;
+  wfCtx.shadowBlur = 8;
+  wfCtx.shadowColor = '#cc44ff';
+  wfCtx.stroke();
+  wfCtx.shadowBlur = 0;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SPECTRUM RENDERER
+// ═══════════════════════════════════════════════════════════════
+const spCanvas = document.getElementById('spectrum-canvas');
+const spCtx = spCanvas.getContext('2d');
+
+function renderSpectrum() {
+  const W = 230, H = 30;
+  spCanvas.width = W; spCanvas.height = H;
+  spCtx.clearRect(0,0,W,H);
+  const t = Date.now() * 0.001;
+  const amp = STATE.amplitude;
+  const freq = STATE.driveFreq;
+
+  const bands = 40;
+  for (let i = 0; i < bands; i++) {
+    const x = (i / bands) * W;
+    const bw = (W / bands) - 1;
+    const baseH = Math.sin(i * 0.8 + t * freq * 0.0001) * 0.5 + 0.5;
+    const h = baseH * H * amp / 3;
+    const r = i / bands;
+    const g = 1 - r * 0.5;
+    spCtx.fillStyle = `rgba(0,${Math.floor(255*g)},${Math.floor(255*(1-r))},0.8)`;
+    spCtx.fillRect(x, H - h, bw, h);
+  }
+
+  // H-line marker
+  const hx = (1420 / 2000) * W;
+  spCtx.strokeStyle = '#00ff88';
+  spCtx.lineWidth = 1;
+  spCtx.beginPath(); spCtx.moveTo(hx,0); spCtx.lineTo(hx,H); spCtx.stroke();
+  spCtx.fillStyle = 'rgba(0,255,136,0.6)';
+  spCtx.font = '6px Share Tech Mono';
+  spCtx.fillText('H', hx-3, H-2);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PHYSICS UPDATE
+// ═══════════════════════════════════════════════════════════════
+function updatePhysics() {
+  if (STATE.autoNav && STATE.navTarget) {
+    const obj = OBJECTS[STATE.navTarget];
+    const dx = obj.x - STATE.pos.x;
+    const dy = obj.y - STATE.pos.y;
+    const dz = obj.z - STATE.pos.z;
+    const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+    if (dist > 1) {
+      const speed = STATE.thrustPower * STATE.warpFactor * 0.5;
+      STATE.vel.x += (dx/dist) * speed * 0.01;
+      STATE.vel.y += (dy/dist) * speed * 0.01;
+      STATE.vel.z += (dz/dist) * speed * 0.01;
+    } else {
+      STATE.autoNav = false;
+      addLog(`ARRIVED: ${obj.name}`, 'data');
+    }
+  }
+
+  // Velocity damping (drag)
+  STATE.vel.x *= 0.98;
+  STATE.vel.y *= 0.98;
+  STATE.vel.z *= 0.98;
+
+  // Position update
+  STATE.pos.x += STATE.vel.x * 0.01;
+  STATE.pos.y += STATE.vel.y * 0.01;
+  STATE.pos.z += STATE.vel.z * 0.01;
+
+  // Ocean depth
+  if (STATE.mode === 'ocean') {
+    STATE.oceanDepth = STATE.pos.y;
+  }
+
+  // Bubble physics
+  const t = Date.now() * 0.001;
+  const pressure = STATE.amplitude * 101325 * Math.sin(2 * Math.PI * STATE.driveFreq * t * 0.0001);
+  STATE.bubbleR = Math.max(0.5e-6, 5e-6 + pressure * 1e-11);
+  STATE.bubbleV = pressure * 0.001;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UI UPDATES
+// ═══════════════════════════════════════════════════════════════
+function updateUI() {
+  const t = Date.now();
+  const utc = new Date(t).toUTCString().slice(-12,-4);
+  document.getElementById('live-time').textContent = utc + ' UTC';
+
+  const velMag = Math.sqrt(STATE.vel.x**2 + STATE.vel.y**2 + STATE.vel.z**2);
+  const distSol = Math.sqrt(STATE.pos.x**2 + STATE.pos.y**2 + STATE.pos.z**2);
+
+  document.getElementById('pos-x').textContent = `${STATE.pos.x >= 0?'+':''}${STATE.pos.x.toFixed(3)} AU`;
+  document.getElementById('pos-y').textContent = `${STATE.pos.y >= 0?'+':''}${STATE.pos.y.toFixed(3)} AU`;
+  document.getElementById('pos-z').textContent = `${STATE.pos.z >= 0?'+':''}${STATE.pos.z.toFixed(3)} AU`;
+  document.getElementById('dist-sol').textContent = distSol < 0.01 ? `${(distSol*149597870.7).toFixed(0)} km` : `${distSol.toFixed(4)} AU`;
+  document.getElementById('gal-l').textContent = `${(Math.atan2(STATE.pos.z, STATE.pos.x) * 180/Math.PI + 360).toFixed(2)}°`;
+  document.getElementById('gal-b').textContent = `${(Math.atan2(STATE.pos.y, Math.sqrt(STATE.pos.x**2+STATE.pos.z**2)) * 180/Math.PI).toFixed(2)}°`;
+
+  const sector = distSol < 0.01 ? 'SOL SYSTEM' : distSol < 5 ? 'INNER HELIOSPHERE' : distSol < 50 ? 'OUTER SYSTEM' : 'DEEP SPACE';
+  document.getElementById('sector').textContent = sector;
+
+  document.getElementById('vel-x').textContent = `${STATE.vel.x.toFixed(3)} km/s`;
+  document.getElementById('vel-y').textContent = `${STATE.vel.y.toFixed(3)} km/s`;
+  document.getElementById('vel-z').textContent = `${STATE.vel.z.toFixed(3)} km/s`;
+  document.getElementById('vel-total').textContent = `${velMag.toFixed(3)} km/s`;
+  document.getElementById('accel-val').textContent = `${(velMag * 0.01).toFixed(2)} m/s²`;
+  document.getElementById('pct-c').textContent = `${(velMag / 299792.458 * 100).toFixed(4)}%`;
+
+  document.getElementById('hud-vel').textContent = velMag.toFixed(3);
+  document.getElementById('hud-bear').textContent = `${((STATE.viewAngleY * 180/Math.PI + 360) % 360).toFixed(1)}°`;
+  document.getElementById('hud-fov').textContent = `${STATE.fov.toFixed(2)}°`;
+  document.getElementById('hud-throttle').textContent = `${STATE.thrustPower.toFixed(0)}%`;
+  document.getElementById('hud-alt').textContent = STATE.mode === 'ocean' ? `${Math.abs(STATE.oceanDepth).toFixed(0)}m` : '—';
+
+  // Env scan (live random variation)
+  const envT = STATE.mode === 'ocean' ? `${(4 - Math.abs(STATE.oceanDepth) * 0.0003).toFixed(1)}°C` : '2.725 K';
+  document.getElementById('env-temp').textContent = envT;
+  document.getElementById('rad-meter').style.width = `${10 + velMag * 0.001}%`;
+
+  // Bubble
+  document.getElementById('bubble-r').textContent = `${(STATE.bubbleR * 1e6).toFixed(2)} μm`;
+  document.getElementById('bubble-v').textContent = `${Math.abs(STATE.bubbleV).toFixed(2)} m/s`;
+  document.getElementById('bubble-p').textContent = `${(101.325 + STATE.amplitude * 50).toFixed(1)} kPa`;
+
+  // Drive freq
+  document.getElementById('drive-freq').textContent = `${(STATE.driveFreq/1000).toFixed(0)} kHz`;
+
+  // Sound speed (Medwin formula)
+  const depth = Math.abs(STATE.oceanDepth);
+  const tempC = Math.max(2, 4 - depth * 0.0003);
+  const soundSpeed = 1449.2 + 4.6 * tempC + 0.016 * depth;
+  document.getElementById('sound-speed').textContent = `${soundSpeed.toFixed(0)} m/s`;
+  document.getElementById('sofar-depth').textContent = `${depth > 600 && depth < 1200 ? '✓ ' : ''}1000 m`;
+
+  // Redshift
+  const z = STATE.redshift;
+  document.getElementById('redshift-val').textContent = `z=${z}`;
+  document.getElementById('sound-horiz').textContent = `${(147 * z/1100).toFixed(0)} Mpc`;
+  document.getElementById('acoustic-freq').textContent = `${(173 / (z/1100 + 0.001)).toFixed(0)} MHz`;
+
+  // Hubble orbit counter
+  const orbitNum = 17449 + Math.floor((Date.now() - 1700000000000) / 5760000);
+  document.getElementById('hubble-orbit').textContent = `#${orbitNum}`;
+
+  // Sys power
+  document.getElementById('sys-power').textContent = `${(98.7 - velMag * 0.001).toFixed(1)}%`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONTROLS & INTERACTIONS
+// ═══════════════════════════════════════════════════════════════
+function thrust(dx, dy, dz) {
+  const p = STATE.thrustPower * STATE.warpFactor;
+  STATE.vel.x += dx * p;
+  STATE.vel.y += dy * p;
+  STATE.vel.z += dz * p;
+  addLog(`THRUST: [${dx>0?'+':''}${dx},${dy>0?'+':''}${dy},${dz>0?'+':''}${dz}] × ${p.toFixed(1)}`, 'info');
+}
+
+function stopThrust() {
+  STATE.vel.x *= 0.5; STATE.vel.y *= 0.5; STATE.vel.z *= 0.5;
+  addLog('THRUST REDUCED 50%', 'warn');
+}
+
+function fullStop() {
+  STATE.vel.x = 0; STATE.vel.y = 0; STATE.vel.z = 0;
+  STATE.autoNav = false;
+  addLog('FULL STOP ENGAGED', 'warn');
+}
+
+function selectTarget(val) {
+  if (OBJECTS[val]) {
+    STATE.targetLocked = val;
+    const obj = OBJECTS[val];
+    document.getElementById('target-name').textContent = obj.name;
+    document.getElementById('target-type').textContent = obj.type;
+    const dx = obj.x - STATE.pos.x;
+    const dy = obj.y - STATE.pos.y;
+    const dz = obj.z - STATE.pos.z;
+    const dist = Math.sqrt(dx*dx+dy*dy+dz*dz);
+    document.getElementById('target-dist').textContent = dist < 1 ? `${(dist*149597870.7).toFixed(0)} km` : `${dist.toFixed(4)} AU`;
+  }
+}
+
+function lockTarget() {
+  const val = document.getElementById('target-select').value;
+  selectTarget(val);
+  const obj = OBJECTS[val];
+  if (obj) {
+    document.getElementById('info-name').textContent = obj.name;
+    document.getElementById('info-type').textContent = obj.type;
+    document.getElementById('info-dist').textContent = obj.dist;
+    document.getElementById('info-mass').textContent = obj.mass;
+    document.getElementById('info-temp').textContent = obj.temp;
+    document.getElementById('info-radius').textContent = obj.radius;
+    document.getElementById('obj-info').classList.add('visible');
+    addLog(`TARGET LOCKED: ${obj.name} [${obj.type}]`, 'data');
+    setTimeout(() => document.getElementById('obj-info').classList.remove('visible'), 5000);
+  }
+}
+
+function navigateTo() {
+  const val = document.getElementById('target-select').value;
+  if (OBJECTS[val]) {
+    STATE.navTarget = val;
+    STATE.autoNav = true;
+    addLog(`AUTO-NAV: PLOTTING COURSE TO ${OBJECTS[val].name}`, 'warn');
+  }
+}
+
+function scanTarget() {
+  const val = document.getElementById('target-select').value;
+  const obj = OBJECTS[val];
+  if (obj) {
+    addLog(`DEEP SCAN: ${obj.name}`, 'data');
+    addLog(`  TYPE: ${obj.type}`, 'info');
+    addLog(`  TEMP: ${obj.temp}`, 'info');
+    addLog(`  MASS: ${obj.mass}`, 'info');
+  }
+}
+
+function scanNHI() {
+  const snr = (Math.random() * 20).toFixed(1);
+  const anomaly = Math.random() > 0.7 ? 'DETECTED' : 'NONE';
+  document.getElementById('nhi-snr').textContent = `${snr} dB`;
+  document.getElementById('nhi-anomaly').textContent = anomaly;
+  if (anomaly === 'DETECTED') {
+    addLog('⚠ NHI SIGNAL ANOMALY DETECTED AT 1420 MHz!', 'warn');
+  } else {
+    addLog(`NHI SCAN: SNR=${snr}dB — NO ANOMALY`, 'data');
+  }
+}
+
+function fetchHubbleData() {
+  const prog = HUBBLE_PROGRAMS[Math.floor(Math.random() * HUBBLE_PROGRAMS.length)];
+  document.getElementById('hubble-point').textContent = prog.pointing;
+  document.getElementById('hubble-inst').textContent = prog.instrument;
+  document.getElementById('hubble-exp').textContent = prog.exposure;
+  document.getElementById('hubble-img-area').innerHTML = `
+    <div style="border:1px solid rgba(0,255,136,0.2);padding:6px;color:var(--neon-green)">
+      <div>TARGET: ${prog.pointing}</div>
+      <div>INST: ${prog.instrument}</div>
+      <div>EXP: ${prog.exposure}</div>
+      <div style="color:var(--text-dim);margin-top:3px">LIVE TELEMETRY ACTIVE</div>
+    </div>`;
+  addLog(`HUBBLE DATA: ${prog.pointing} via ${prog.instrument}`, 'data');
+}
+
+function setMode(mode) {
+  STATE.mode = mode;
+  const panelL = document.getElementById('panel-left');
+  const modeLabel = document.getElementById('mode-label');
+  if (mode === 'ocean') {
+    panelL.classList.add('ocean-mode');
+    modeLabel.textContent = 'MODE: DEEP OCEAN';
+    document.querySelector('.mode-btn.ocean').classList.add('active-ocean');
+    document.querySelector('.mode-btn.space').classList.remove('active-space');
+    STATE.pos.y = -1000; // Start at SOFAR depth
+    addLog('SWITCHED TO OCEAN MODE — SOFAR CHANNEL', 'ocean');
+  } else {
+    panelL.classList.remove('ocean-mode');
+    modeLabel.textContent = 'MODE: DEEP SPACE';
+    document.querySelector('.mode-btn.space').classList.add('active-space');
+    document.querySelector('.mode-btn.ocean').classList.remove('active-ocean');
+    STATE.pos.y = 0;
+    addLog('SWITCHED TO SPACE MODE — STELLAR NAVIGATION', 'info');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MOUSE DRAG TO ROTATE VIEW
+// ═══════════════════════════════════════════════════════════════
+mainCanvas.addEventListener('mousedown', e => {
+  STATE.isDragging = true;
+  STATE.lastMouse = { x: e.clientX, y: e.clientY };
+});
+document.addEventListener('mousemove', e => {
+  if (!STATE.isDragging) return;
+  const dx = e.clientX - STATE.lastMouse.x;
+  const dy = e.clientY - STATE.lastMouse.y;
+  STATE.viewAngleY += dx * 0.003;
+  STATE.viewAngleX += dy * 0.003;
+  STATE.lastMouse = { x: e.clientX, y: e.clientY };
+});
+document.addEventListener('mouseup', () => STATE.isDragging = false);
+
+// SCROLL TO ZOOM
+mainCanvas.addEventListener('wheel', e => {
+  STATE.fov = Math.max(0.01, Math.min(90, STATE.fov * (e.deltaY > 0 ? 1.1 : 0.9)));
+  e.preventDefault();
+}, { passive: false });
+
+// KEYBOARD CONTROLS
+document.addEventListener('keydown', e => {
+  const p = STATE.thrustPower * STATE.warpFactor * 0.5;
+  switch(e.key) {
+    case 'ArrowUp': case 'w': thrust(0, 0, -1); break;
+    case 'ArrowDown': case 's': thrust(0, 0, 1); break;
+    case 'ArrowLeft': case 'a': thrust(-1, 0, 0); break;
+    case 'ArrowRight': case 'd': thrust(1, 0, 0); break;
+    case 'q': thrust(0, -1, 0); break;
+    case 'e': thrust(0, 1, 0); break;
+    case ' ': fullStop(); e.preventDefault(); break;
+    case '+': case '=': STATE.fov *= 0.8; break;
+    case '-': STATE.fov *= 1.25; break;
+  }
+});
+
+// SLIDERS
+document.getElementById('thrust-power').addEventListener('input', e => {
+  STATE.thrustPower = parseFloat(e.target.value);
+});
+document.getElementById('warp-factor').addEventListener('input', e => {
+  STATE.warpFactor = parseFloat(e.target.value);
+});
+document.getElementById('redshift-range').addEventListener('input', e => {
+  STATE.redshift = parseInt(e.target.value);
+});
+document.getElementById('amplitude-range').addEventListener('input', e => {
+  STATE.amplitude = parseFloat(e.target.value);
+});
+document.getElementById('freq-range').addEventListener('input', e => {
+  STATE.driveFreq = parseFloat(e.target.value) * 1000;
+});
+
+// ═══════════════════════════════════════════════════════════════
+// LOG CONSOLE
+// ═══════════════════════════════════════════════════════════════
+const LOG_MAX = 50;
+const logs = [];
+
+function addLog(msg, type = 'info') {
+  const t = new Date().toISOString().slice(11,19);
+  logs.unshift({ t, msg, type });
+  if (logs.length > LOG_MAX) logs.pop();
+  renderLog();
+}
+
+function renderLog() {
+  const el = document.getElementById('log-console');
+  el.innerHTML = logs.slice(0, 12).map(l =>
+    `<div class="log-line"><span class="log-time">${l.t}</span><span class="log-${l.type}">${l.msg}</span></div>`
+  ).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LIVE DATA SIMULATION (real-time cosmic values)
+// ═══════════════════════════════════════════════════════════════
+function updateLiveData() {
+  const t = Date.now() * 0.001;
+
+  // RA/DEC based on view angle
+  const ra_h = ((STATE.viewAngleY * 180/Math.PI + 360) % 360) / 15;
+  const ra_m = (ra_h % 1) * 60;
+  const ra_s = (ra_m % 1) * 60;
+  const dec_d = STATE.viewAngleX * 180/Math.PI;
+  const dec_m = Math.abs((dec_d % 1) * 60);
+  document.getElementById('hud-ra').textContent =
+    `${Math.floor(ra_h).toString().padStart(2,'0')}h ${Math.floor(ra_m).toString().padStart(2,'0')}m ${ra_s.toFixed(0).padStart(2,'0')}s`;
+  document.getElementById('hud-dec').textContent =
+    `${dec_d>=0?'+':''}${Math.floor(dec_d).toString().padStart(3,'0')}° ${Math.floor(dec_m).toString().padStart(2,'0')}'`;
+
+  // Periodic live log entries
+  if (STATE.tick % 300 === 0) {
+    const entries = [
+      ['CMB TEMPERATURE: 2.72548 K — NOMINAL', 'data'],
+      ['SOLAR WIND: 420 km/s — ACTIVE', 'info'],
+      ['ACOUSTIC HORIZON: SCANNING...', 'info'],
+      ['PRIME SEQUENCE VERIFIED: 2,3,5,7,11,13,17,19...', 'data'],
+      ['H-LINE FREQUENCY: 1420.405 MHz — CLEAR', 'data'],
+      ['SOFAR PROPAGATION: 25,000 km RANGE', 'ocean'],
+    ];
+    const e = entries[Math.floor(Math.random() * entries.length)];
+    addLog(e[0], e[1]);
+  }
+
+  // Hubble meter flicker
+  const hm = 80 + Math.sin(t * 0.1) * 8;
+  document.getElementById('hubble-meter').style.width = `${hm}%`;
+  document.getElementById('bubble-meter').style.width = `${STATE.amplitude / 3 * 100}%`;
+
+  STATE.tick++;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN LOOP
+// ═══════════════════════════════════════════════════════════════
+function loop() {
+  renderStarfield();
+  if (STATE.mode === 'space') renderSpace();
+  else renderOcean();
+  renderWaveform();
+  renderSpectrum();
+  updatePhysics();
+  updateUI();
+  updateLiveData();
+  requestAnimationFrame(loop);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+window.addEventListener('resize', () => { initStars(); resizeCanvases(); });
+initStars();
+resizeCanvases();
+
+addLog('PRIMORDIAL COMMAND CENTER INITIALIZED', 'data');
+addLog('HUBBLE TELESCOPE LINK: ACTIVE', 'data');
+addLog('ACOUSTIC SIMULATION: READY', 'info');
+addLog('NAVIGATION: STANDING BY — USE ARROW KEYS OR BUTTONS', 'info');
+addLog('MODE: DEEP SPACE — STELLAR CARTOGRAPHY ACTIVE', 'info');
+
+selectTarget('sun');
+loop();
+</script>
+</body>
+</html>
